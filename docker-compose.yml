@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  wechat-notifier:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: wechat-notifier
+    restart: unless-stopped
+    ports:
+      - "12121:12121"
+    volumes:
+      - ./database:/app/database:rw
+      - ./uploads:/app/uploads:rw
+    environment:
+      PORT: 12121
+      DB_PATH: /app/database/notifier.db
+      ENCRYPTION_KEY: change-this-to-a-random-32-character-string
+      NODE_ENV: production
+      WECHAT_API_BASE: https://qyapi.weixin.qq.com
+      TZ: Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:12121/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

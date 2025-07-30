@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="garden">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企业微信通知服务 - 增强版API文档</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.5.0/dist/full.css" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+        }
+
+        body {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bef264 100%);
+            min-height: 100vh;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+
+<body class="flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-6xl glass-card p-8 my-8">
+        <header class="mb-8">
+            <div class="flex items-center justify-between">
+                <h1 class="text-3xl font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="zap" class="h-8 w-8"></i>
+                    增强版API文档
+                </h1>
+                <div class="flex gap-2">
+                    <a href="/public/api-docs.html" class="btn btn-outline btn-sm">
+                        <i data-lucide="book" class="h-4 w-4 mr-1"></i>
+                        基础API
+                    </a>
+                    <a href="/" class="btn btn-outline btn-sm">
+                        <i data-lucide="arrow-left" class="h-4 w-4 mr-1"></i>
+                        返回首页
+                    </a>
+                </div>
+            </div>
+            <p class="text-base-content/70 mt-2">支持多种消息格式：文本卡片、Markdown、图文、文件等</p>
+        </header>
+
+        <div class="space-y-8">
+            <!-- 支持的消息格式概览 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="layers" class="h-6 w-6"></i>
+                    支持的消息格式
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-lg flex items-center gap-2">
+                                <i data-lucide="type" class="h-5 w-5"></i>
+                                文本消息
+                            </h3>
+                            <p class="text-sm">普通文本消息，支持标题和内容</p>
+                            <div class="badge badge-primary">基础功能</div>
+                        </div>
+                    </div>
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-lg flex items-center gap-2">
+                                <i data-lucide="credit-card" class="h-5 w-5"></i>
+                                文本卡片
+                            </h3>
+                            <p class="text-sm">带链接的卡片消息，支持按钮</p>
+                            <div class="badge badge-secondary">增强功能</div>
+                        </div>
+                    </div>
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-lg flex items-center gap-2">
+                                <i data-lucide="hash" class="h-5 w-5"></i>
+                                Markdown
+                            </h3>
+                            <p class="text-sm">支持Markdown格式的富文本</p>
+                            <div class="badge badge-accent">增强功能</div>
+                        </div>
+                    </div>
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-lg flex items-center gap-2">
+                                <i data-lucide="newspaper" class="h-5 w-5"></i>
+                                图文消息
+                            </h3>
+                            <p class="text-sm">多图文消息，支持图片和链接</p>
+                            <div class="badge badge-accent">增强功能</div>
+                        </div>
+                    </div>
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-lg flex items-center gap-2">
+                                <i data-lucide="image" class="h-5 w-5"></i>
+                                图片消息
+                            </h3>
+                            <p class="text-sm">发送图片文件</p>
+                            <div class="badge badge-accent">增强功能</div>
+                        </div>
+                    </div>
+                    <div class="card bg-base-100 shadow-sm">
+                        <div class="card-body p-4">
+                            <h3 class="card-title text-lg flex items-center gap-2">
+                                <i data-lucide="file" class="h-5 w-5"></i>
+                                文件消息
+                            </h3>
+                            <p class="text-sm">发送各种文件附件</p>
+                            <div class="badge badge-accent">增强功能</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 文本卡片消息 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="credit-card" class="h-6 w-6"></i>
+                    文本卡片消息
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求地址</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <code class="text-sm">POST /api/notify/{your_code}/textcard</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求参数</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>参数名</th>
+                                        <th>类型</th>
+                                        <th>必填</th>
+                                        <th>说明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-mono">title</td>
+                                        <td>String</td>
+                                        <td>是</td>
+                                        <td>卡片标题，不超过128个字节</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">description</td>
+                                        <td>String</td>
+                                        <td>是</td>
+                                        <td>卡片描述，不超过512个字节</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">url</td>
+                                        <td>String</td>
+                                        <td>是</td>
+                                        <td>点击后跳转的链接</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">btntxt</td>
+                                        <td>String</td>
+                                        <td>否</td>
+                                        <td>按钮文字，默认为"详情"</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm">curl -X POST "http://your-server.com/api/notify/your-code/textcard" \
+-H "Content-Type: application/json" \
+-d '{
+  "title": "🚨 服务器告警",
+  "description": "服务器CPU使用率过高，当前使用率：85%，请及时处理！",
+  "url": "https://monitor.example.com/server/web-01",
+  "btntxt": "查看详情"
+}'</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Markdown消息 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="hash" class="h-6 w-6"></i>
+                    Markdown消息
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求地址</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <code class="text-sm">POST /api/notify/{your_code}/markdown</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求参数</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>参数名</th>
+                                        <th>类型</th>
+                                        <th>必填</th>
+                                        <th>说明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-mono">content</td>
+                                        <td>String</td>
+                                        <td>是</td>
+                                        <td>Markdown格式的消息内容</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">支持的Markdown语法</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm"># 标题
+## 二级标题
+**粗体文本**
+*斜体文本*
+[链接文本](http://example.com)
+`代码`
+> 引用文本</pre>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm">curl -X POST "http://your-server.com/api/notify/your-code/markdown" \
+-H "Content-Type: application/json" \
+-d '{
+  "content": "# 📊 系统监控报告\n\n## 服务器状态\n- **CPU使用率**: 45%\n- **内存使用率**: 67%\n- **磁盘使用率**: 23%\n\n> 系统运行正常\n\n[查看详细监控](https://monitor.example.com)"
+}'</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 图文消息 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="newspaper" class="h-6 w-6"></i>
+                    图文消息
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求地址</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <code class="text-sm">POST /api/notify/{your_code}/news</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求参数</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>参数名</th>
+                                        <th>类型</th>
+                                        <th>必填</th>
+                                        <th>说明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-mono">articles</td>
+                                        <td>Array</td>
+                                        <td>是</td>
+                                        <td>图文数组，最多8个</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">articles[].title</td>
+                                        <td>String</td>
+                                        <td>是</td>
+                                        <td>图文标题，不超过128个字节</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">articles[].description</td>
+                                        <td>String</td>
+                                        <td>否</td>
+                                        <td>图文描述，不超过512个字节</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">articles[].url</td>
+                                        <td>String</td>
+                                        <td>是</td>
+                                        <td>点击后跳转的链接</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">articles[].picurl</td>
+                                        <td>String</td>
+                                        <td>否</td>
+                                        <td>图片链接，支持JPG、PNG格式</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm">curl -X POST "http://your-server.com/api/notify/your-code/news" \
+-H "Content-Type: application/json" \
+-d '{
+  "articles": [
+    {
+      "title": "🚀 新版本发布",
+      "description": "v2.0版本已发布，包含多项新功能和性能优化",
+      "url": "https://example.com/release/v2.0",
+      "picurl": "https://example.com/images/release.jpg"
+    },
+    {
+      "title": "📊 月度报告",
+      "description": "查看本月系统运行报告和统计数据",
+      "url": "https://example.com/reports/monthly"
+    }
+  ]
+}'</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 文件消息 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="file" class="h-6 w-6"></i>
+                    文件消息
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求地址</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <code class="text-sm">POST /api/notify/{your_code}/file</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求方式</h3>
+                        <p class="text-sm text-base-content/70 mb-2">使用 multipart/form-data 格式上传文件</p>
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>参数名</th>
+                                        <th>类型</th>
+                                        <th>必填</th>
+                                        <th>说明</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td class="font-mono">file</td>
+                                        <td>File</td>
+                                        <td>是</td>
+                                        <td>要上传的文件，最大20MB</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="font-mono">fileType</td>
+                                        <td>String</td>
+                                        <td>否</td>
+                                        <td>文件类型：file(默认) 或 image</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">支持的文件类型</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <div class="badge badge-outline">jpg/jpeg</div>
+                            <div class="badge badge-outline">png</div>
+                            <div class="badge badge-outline">gif</div>
+                            <div class="badge badge-outline">pdf</div>
+                            <div class="badge badge-outline">doc/docx</div>
+                            <div class="badge badge-outline">xls/xlsx</div>
+                            <div class="badge badge-outline">ppt/pptx</div>
+                            <div class="badge badge-outline">txt</div>
+                            <div class="badge badge-outline">zip</div>
+                            <div class="badge badge-outline">rar</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm"># 发送文件
+curl -X POST "http://your-server.com/api/notify/your-code/file" \
+-F "file=@/path/to/report.pdf" \
+-F "fileType=file"
+
+# 发送图片
+curl -X POST "http://your-server.com/api/notify/your-code/file" \
+-F "file=@/path/to/screenshot.png" \
+-F "fileType=image"</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 通用增强消息 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="zap" class="h-6 w-6"></i>
+                    通用增强消息接口
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求地址</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <code class="text-sm">POST /api/notify/{your_code}/enhanced</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求参数</h3>
+                        <p class="text-sm text-base-content/70 mb-2">根据消息类型提供相应的参数，type字段必填</p>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm"># 文本消息
+{
+  "type": "text",
+  "content": "消息内容"
+}
+
+# 文本卡片
+{
+  "type": "textcard",
+  "title": "卡片标题",
+  "description": "卡片描述",
+  "url": "跳转链接",
+  "btntxt": "按钮文字"
+}
+
+# Markdown消息
+{
+  "type": "markdown",
+  "content": "# Markdown内容"
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 获取支持格式 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="info" class="h-6 w-6"></i>
+                    获取支持的消息格式
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">请求地址</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <code class="text-sm">GET /api/notify/{your_code}/formats</code>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">返回示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm">{
+  "supportedFormats": [
+    {
+      "type": "text",
+      "name": "文本消息",
+      "description": "普通文本消息",
+      "endpoint": "/api/notify/:code",
+      "parameters": ["title", "content"]
+    },
+    {
+      "type": "textcard",
+      "name": "文本卡片",
+      "description": "带链接的卡片消息",
+      "endpoint": "/api/notify/:code/textcard",
+      "parameters": ["title", "description", "url", "btntxt?"]
+    }
+  ]
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 使用示例 -->
+            <section>
+                <h2 class="text-2xl font-bold mb-4 flex items-center gap-2">
+                    <i data-lucide="code" class="h-6 w-6"></i>
+                    编程语言示例
+                </h2>
+                <div class="bg-base-100 p-6 rounded-lg shadow-sm space-y-6">
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">Python示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm">import requests
+
+class EnhancedWeChatNotifier:
+    def __init__(self, base_url, code):
+        self.base_url = base_url
+        self.code = code
+    
+    def send_textcard(self, title, description, url, btntxt="详情"):
+        """发送文本卡片"""
+        response = requests.post(f"{self.base_url}/api/notify/{self.code}/textcard", json={
+            "title": title,
+            "description": description,
+            "url": url,
+            "btntxt": btntxt
+        })
+        return response.json()
+    
+    def send_markdown(self, content):
+        """发送Markdown消息"""
+        response = requests.post(f"{self.base_url}/api/notify/{self.code}/markdown", json={
+            "content": content
+        })
+        return response.json()
+    
+    def send_file(self, file_path, file_type="file"):
+        """发送文件"""
+        with open(file_path, 'rb') as f:
+            files = {'file': f}
+            data = {'fileType': file_type}
+            response = requests.post(f"{self.base_url}/api/notify/{self.code}/file", 
+                                   files=files, data=data)
+        return response.json()
+
+# 使用示例
+notifier = EnhancedWeChatNotifier("http://your-server:12121", "your-code")
+
+# 发送告警卡片
+notifier.send_textcard(
+    "🚨 系统告警",
+    "服务器CPU使用率过高，请及时处理！",
+    "https://monitor.example.com/alerts/001"
+)
+
+# 发送Markdown报告
+notifier.send_markdown("""
+# 📊 日报
+## 今日数据
+- **用户访问**: 1,234
+- **订单数量**: 56
+- **收入**: ¥12,345
+""")
+
+# 发送文件
+notifier.send_file("/path/to/report.pdf")</pre>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-medium mb-2 text-lg">JavaScript示例</h3>
+                        <div class="bg-base-200 p-3 rounded-md">
+                            <pre class="text-sm">class EnhancedWeChatNotifier {
+    constructor(baseUrl, code) {
+        this.baseUrl = baseUrl;
+        this.code = code;
+    }
+
+    async sendTextCard(title, description, url, btntxt = '详情') {
+        const response = await fetch(`${this.baseUrl}/api/notify/${this.code}/textcard`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, description, url, btntxt })
+        });
+        return response.json();
+    }
+
+    async sendNews(articles) {
+        const response = await fetch(`${this.baseUrl}/api/notify/${this.code}/news`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ articles })
+        });
+        return response.json();
+    }
+}
+
+// 使用示例
+const notifier = new EnhancedWeChatNotifier('http://your-server:12121', 'your-code');
+
+// 发送图文消息
+await notifier.sendNews([
+    {
+        title: '🚀 新功能上线',
+        description: '增强版API现已支持多种消息格式',
+        url: 'https://example.com/features',
+        picurl: 'https://example.com/images/feature.jpg'
+    }
+]);</pre>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <footer class="text-center text-sm text-base-content/60 mb-4">
+        <p class="flex items-center justify-center gap-1">
+            <i data-lucide="external-link" class="h-4 w-4"></i>
+            <a href="https://www.wangwangit.com/" target="_blank"
+                class="hover:text-primary transition-colors">一只会飞的旺旺</a>
+        </p>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+
+</html>

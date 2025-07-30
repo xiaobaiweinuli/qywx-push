@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="garden">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息发送测试 - 企业微信通知服务</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.5.0/dist/full.css" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+        }
+        body {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bef264 100%);
+            min-height: 100vh;
+        }
+        .file-drop-zone {
+            border: 2px dashed #cbd5e1;
+            transition: all 0.3s ease;
+        }
+        .file-drop-zone.dragover {
+            border-color: #3b82f6;
+            background-color: rgba(59, 130, 246, 0.1);
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center p-4">
+    <div class="w-full max-w-4xl glass-card p-8 my-8">
+        <header class="mb-8">
+            <div class="flex items-center justify-between">
+                <h1 class="text-3xl font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="send" class="h-8 w-8"></i>
+                    消息发送测试
+                </h1>
+                <div class="flex gap-2">
+                    <a href="/public/enhanced-api-docs.html" class="btn btn-outline btn-sm">
+                        <i data-lucide="book" class="h-4 w-4 mr-1"></i>
+                        API文档
+                    </a>
+                    <a href="/" class="btn btn-outline btn-sm">
+                        <i data-lucide="arrow-left" class="h-4 w-4 mr-1"></i>
+                        返回首页
+                    </a>
+                </div>
+            </div>
+            <p class="text-base-content/70 mt-2">测试各种消息格式的发送功能</p>
+        </header>
+
+        <!-- 配置Code输入 -->
+        <div class="mb-6">
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium">配置Code</span>
+                </label>
+                <input type="text" id="config-code" class="input input-bordered" 
+                       value="ee91ec52-2726-4761-881e-45c01e1b3572" 
+                       placeholder="请输入您的配置Code">
+                <div class="label">
+                    <span class="label-text-alt text-base-content/60">从配置页面获取的唯一Code</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 消息类型选择 -->
+        <div class="tabs tabs-boxed mb-6">
+            <a class="tab tab-active" data-tab="text">📝 文本消息</a>
+            <a class="tab" data-tab="textcard">💳 文本卡片</a>
+            <a class="tab" data-tab="markdown">📋 Markdown</a>
+            <a class="tab" data-tab="news">📰 图文消息</a>
+            <a class="tab" data-tab="file">📁 文件消息</a>
+            <a class="tab" data-tab="enhanced">⚡ 自定义</a>
+        </div>
+
+        <!-- 文本消息 -->
+        <div id="tab-text" class="tab-content">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title">📝 发送文本消息</h3>
+                    <form id="text-form" class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">消息标题（可选）</span>
+                            </label>
+                            <input type="text" name="title" class="input input-bordered" placeholder="如：系统告警">
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">消息内容</span>
+                            </label>
+                            <textarea name="content" class="textarea textarea-bordered h-24" 
+                                    placeholder="请输入消息内容..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            <i data-lucide="send" class="h-4 w-4 mr-1"></i>
+                            发送文本消息
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文本卡片 -->
+        <div id="tab-textcard" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title">💳 发送文本卡片</h3>
+                    <form id="textcard-form" class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">卡片标题</span>
+                            </label>
+                            <input type="text" name="title" class="input input-bordered" 
+                                   placeholder="如：🚨 服务器告警" required>
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">卡片描述</span>
+                            </label>
+                            <textarea name="description" class="textarea textarea-bordered h-20" 
+                                    placeholder="详细描述信息..." required></textarea>
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">跳转链接</span>
+                            </label>
+                            <input type="url" name="url" class="input input-bordered" 
+                                   placeholder="https://example.com" required>
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">按钮文字</span>
+                            </label>
+                            <input type="text" name="btntxt" class="input input-bordered" 
+                                   placeholder="详情" value="查看详情">
+                        </div>
+                        <button type="submit" class="btn btn-secondary">
+                            <i data-lucide="credit-card" class="h-4 w-4 mr-1"></i>
+                            发送文本卡片
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Markdown消息 -->
+        <div id="tab-markdown" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title">📋 发送Markdown消息</h3>
+                    <form id="markdown-form" class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">Markdown内容</span>
+                            </label>
+                            <textarea name="content" class="textarea textarea-bordered h-32" 
+                                    placeholder="# 标题&#10;## 二级标题&#10;**粗体** *斜体*&#10;[链接](https://example.com)&#10;> 引用文本" required></textarea>
+                            <div class="label">
+                                <span class="label-text-alt">支持标题、粗体、斜体、链接、引用等格式</span>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-accent">
+                            <i data-lucide="hash" class="h-4 w-4 mr-1"></i>
+                            发送Markdown消息
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 图文消息 -->
+        <div id="tab-news" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title">📰 发送图文消息</h3>
+                    <div id="news-articles" class="space-y-4">
+                        <div class="article-item border border-base-300 rounded-lg p-4">
+                            <h4 class="font-medium mb-2">图文项 1</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">标题</span>
+                                    </label>
+                                    <input type="text" name="title" class="input input-bordered input-sm" 
+                                           placeholder="图文标题" required>
+                                </div>
+                                <div class="form-control">
+                                    <label class="label">
+                                        <span class="label-text">链接</span>
+                                    </label>
+                                    <input type="url" name="url" class="input input-bordered input-sm" 
+                                           placeholder="https://example.com" required>
+                                </div>
+                                <div class="form-control md:col-span-2">
+                                    <label class="label">
+                                        <span class="label-text">描述（可选）</span>
+                                    </label>
+                                    <textarea name="description" class="textarea textarea-bordered textarea-sm h-16" 
+                                            placeholder="图文描述"></textarea>
+                                </div>
+                                <div class="form-control md:col-span-2">
+                                    <label class="label">
+                                        <span class="label-text">图片链接（可选）</span>
+                                    </label>
+                                    <input type="url" name="picurl" class="input input-bordered input-sm" 
+                                           placeholder="https://example.com/image.jpg">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button type="button" id="add-article" class="btn btn-outline btn-sm">
+                            <i data-lucide="plus" class="h-4 w-4 mr-1"></i>
+                            添加图文项
+                        </button>
+                        <button type="button" id="send-news" class="btn btn-info">
+                            <i data-lucide="newspaper" class="h-4 w-4 mr-1"></i>
+                            发送图文消息
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 文件消息 -->
+        <div id="tab-file" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title">📁 发送文件消息</h3>
+                    <form id="file-form" class="space-y-4" enctype="multipart/form-data">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">文件类型</span>
+                            </label>
+                            <select name="fileType" class="select select-bordered">
+                                <option value="file">📄 普通文件</option>
+                                <option value="image">🖼️ 图片文件</option>
+                            </select>
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">选择文件</span>
+                            </label>
+                            <div class="file-drop-zone p-8 rounded-lg text-center cursor-pointer" id="file-drop-zone">
+                                <input type="file" name="file" id="file-input" class="hidden" required>
+                                <div id="drop-text">
+                                    <i data-lucide="upload" class="h-12 w-12 mx-auto mb-2 text-base-content/50"></i>
+                                    <p class="text-base-content/70">点击选择文件或拖拽文件到此处</p>
+                                    <p class="text-sm text-base-content/50 mt-1">支持图片、文档、压缩包等，最大20MB</p>
+                                </div>
+                                <div id="file-info" class="hidden">
+                                    <i data-lucide="file" class="h-8 w-8 mx-auto mb-2 text-success"></i>
+                                    <p class="font-medium" id="file-name"></p>
+                                    <p class="text-sm text-base-content/60" id="file-size"></p>
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-warning">
+                            <i data-lucide="upload" class="h-4 w-4 mr-1"></i>
+                            上传并发送文件
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 自定义消息 -->
+        <div id="tab-enhanced" class="tab-content hidden">
+            <div class="card bg-base-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="card-title">⚡ 发送自定义消息</h3>
+                    <form id="enhanced-form" class="space-y-4">
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">消息类型</span>
+                            </label>
+                            <select name="type" class="select select-bordered" required>
+                                <option value="">请选择消息类型</option>
+                                <option value="text">文本消息</option>
+                                <option value="textcard">文本卡片</option>
+                                <option value="markdown">Markdown消息</option>
+                                <option value="news">图文消息</option>
+                            </select>
+                        </div>
+                        <div class="form-control">
+                            <label class="label">
+                                <span class="label-text">消息数据（JSON格式）</span>
+                            </label>
+                            <textarea name="data" class="textarea textarea-bordered h-32 font-mono text-sm" 
+                                    placeholder='{"content": "消息内容"}' required></textarea>
+                            <div class="label">
+                                <span class="label-text-alt">请输入符合对应消息类型的JSON数据</span>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-error">
+                            <i data-lucide="zap" class="h-4 w-4 mr-1"></i>
+                            发送自定义消息
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- 发送结果 -->
+        <div id="result-section" class="mt-8 hidden">
+            <div class="divider">发送结果</div>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <!-- 提示弹窗 -->
+    <div id="toast-container" class="toast toast-top toast-center"></div>
+
+    <footer class="text-center text-sm text-base-content/60 mb-4">
+        <p class="flex items-center justify-center gap-1">
+            <i data-lucide="external-link" class="h-4 w-4"></i>
+            <a href="https://www.wangwangit.com/" target="_blank" class="hover:text-primary transition-colors">一只会飞的旺旺</a>
+        </p>
+    </footer>
+
+    <script src="/public/message-sender.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
