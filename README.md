@@ -1,5 +1,5 @@
 # 企业微信通知服务 | WeChat Work Notification Service
-
+修改自[wangwangit/qywx-push](https://github.com/wangwangit/qywx-push)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-blue.svg)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
