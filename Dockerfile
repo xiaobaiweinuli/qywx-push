@@ -23,4 +23,4 @@ COPY . .
 RUN mkdir -p /app/database && chmod 755 /app/database
 
 EXPOSE 12121
-CMD ["npm"， "start"]
+CMD ["npm","start"]
