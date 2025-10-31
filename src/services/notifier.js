@@ -354,8 +354,27 @@ async function handleCallbackVerification(code, msgSignature, timestamp, nonce, 
             return { success: false, error: '回调配置不完整' };
         }
 
-        // 解密encoding_aes_key
-        const encodingAESKey = crypto.decrypt(config.encrypted_encoding_aes_key);
+        // 解密encoding_aes_key，添加异常处理和验证
+        let encodingAESKey;
+        try {
+            encodingAESKey = crypto.decrypt(config.encrypted_encoding_aes_key);
+            // 验证解密后的encoding_aes_key格式
+            if (!encodingAESKey || encodingAESKey.length !== 43) {
+                console.error('解密后的EncodingAESKey格式错误，长度应为43位');
+                return { success: false, error: '内部配置错误：EncodingAESKey格式不正确' };
+            }
+        } catch (decryptError) {
+            console.error('解密EncodingAESKey失败:', decryptError.message);
+            return { success: false, error: '内部配置错误：无法解密回调密钥' };
+        }
+
+        console.log('回调验证参数检查:', {
+            code: code.substring(0, 8) + '...', // 只显示部分code用于日志
+            hasToken: !!config.callback_token,
+            hasKey: !!encodingAESKey,
+            keyLength: encodingAESKey ? encodingAESKey.length : 0,
+            corpid: config.corpid
+        });
 
         // 创建回调加密实例
         const callbackCrypto = new WeChatCallbackCrypto(
@@ -366,10 +385,17 @@ async function handleCallbackVerification(code, msgSignature, timestamp, nonce, 
 
         // 验证URL
         const result = callbackCrypto.verifyURL(msgSignature, timestamp, nonce, echoStr);
+        if (!result.success) {
+            console.error('URL验证失败详情:', { 
+                error: result.error, 
+                errcode: result.errcode,
+                code: code.substring(0, 8) + '...'
+            });
+        }
         return result;
     } catch (error) {
-        console.error('回调验证失败:', error.message);
-        return { success: false, error: error.message };
+        console.error('回调验证失败:', error.message, error.stack);
+        return { success: false, error: '回调验证内部错误' };
     }
 }
 
@@ -394,8 +420,19 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
             return { success: false, error: '回调配置不完整' };
         }
 
-        // 解密encoding_aes_key
-        const encodingAESKey = crypto.decrypt(config.encrypted_encoding_aes_key);
+        // 解密encoding_aes_key，添加异常处理和验证
+        let encodingAESKey;
+        try {
+            encodingAESKey = crypto.decrypt(config.encrypted_encoding_aes_key);
+            // 验证解密后的encoding_aes_key格式
+            if (!encodingAESKey || encodingAESKey.length !== 43) {
+                console.error('解密后的EncodingAESKey格式错误，长度应为43位');
+                return { success: false, error: '内部配置错误：EncodingAESKey格式不正确' };
+            }
+        } catch (decryptError) {
+            console.error('解密EncodingAESKey失败:', decryptError.message);
+            return { success: false, error: '内部配置错误：无法解密回调密钥' };
+        }
 
         // 创建回调加密实例
         const callbackCrypto = new WeChatCallbackCrypto(

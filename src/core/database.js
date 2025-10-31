@@ -159,24 +159,30 @@ class Database {
         });
     }
 
-    // 保存配置
+    // 保存配置 - 支持冲突时更新
     async saveConfiguration(config) {
         return new Promise((resolve, reject) => {
             const { 
                 code, corpid, encrypted_corpsecret, agentid, touser, description,
                 callback_token, encrypted_encoding_aes_key, callback_enabled 
             } = config;
+            
+            // 使用INSERT OR REPLACE来避免唯一约束冲突
             const sql = `
-                INSERT INTO configurations (
+                INSERT OR REPLACE INTO configurations (
                     code, corpid, encrypted_corpsecret, agentid, touser, description,
-                    callback_token, encrypted_encoding_aes_key, callback_enabled
+                    callback_token, encrypted_encoding_aes_key, callback_enabled, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(
+                    (SELECT created_at FROM configurations WHERE corpid = ? AND agentid = ? AND touser = ?),
+                    CURRENT_TIMESTAMP
+                ))
             `;
 
             this.db.run(sql, [
                 code, corpid, encrypted_corpsecret, agentid, touser, description,
-                callback_token, encrypted_encoding_aes_key, callback_enabled || 0
+                callback_token, encrypted_encoding_aes_key, callback_enabled || 0,
+                corpid, agentid, touser // 用于子查询
             ], function(err) {
                 if (err) {
                     console.error('保存配置失败:', err.message);
@@ -184,7 +190,7 @@ class Database {
                     return;
                 }
                 console.log('配置保存成功, ID:', this.lastID);
-                resolve({ id: this.lastID, code });
+                resolve({ id: this.lastID || null, code });
             });
         });
     }
