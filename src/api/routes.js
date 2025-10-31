@@ -383,7 +383,16 @@ router.get('/api/messages/:code/stats', validateConfigAccess, async (req, res) =
         const { code } = req.params;
         const timeRange = req.query;
         
-        const stats = await notifier.getMessageStats(code, timeRange);
+        // 调用修改后的getMessageStats函数
+        const rawStats = await notifier.getMessageStats(code, timeRange);
+        
+        // 构建符合前端期望格式的响应数据
+        const formattedStats = {
+            total: rawStats.total || 0,
+            unread: rawStats.unread_count || 0,
+            read: rawStats.read_count || 0,
+            today: rawStats.today_count || 0
+        };
         
         // 增强的缓存控制头，确保不会返回304响应
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -394,7 +403,7 @@ router.get('/api/messages/:code/stats', validateConfigAccess, async (req, res) =
         
         res.json({
             success: true,
-            data: stats,
+            data: formattedStats,
             timestamp: Date.now() // 添加时间戳到响应中
         });
     } catch (error) {

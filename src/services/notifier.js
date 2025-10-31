@@ -533,14 +533,18 @@ function buildMessageQuery(queryParams) {
     const params = [];
 
     if (startDate) {
-        conditions.push('create_time >= ?');
-        params.push(new Date(startDate));
+        // 与getMessageStats保持一致，使用created_date字段和YYYY-MM-DD格式
+        conditions.push('created_date >= ?');
+        // 确保日期格式为YYYY-MM-DD
+        const startDateStr = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
+        params.push(startDateStr);
     }
     if (endDate) {
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59, 999);
-        conditions.push('create_time <= ?');
-        params.push(end);
+        // 与getMessageStats保持一致，使用created_date字段和YYYY-MM-DD格式
+        conditions.push('created_date <= ?');
+        // 确保日期格式为YYYY-MM-DD
+        const endDateStr = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
+        params.push(endDateStr);
     }
     if (msgType) {
         conditions.push('msg_type = ?');
@@ -593,7 +597,7 @@ async function queryMessages(configCode, queryParams) {
         const offset = (page - 1) * limit;
 
         // 排序参数
-        const sortField = queryParams.sortBy || 'received_at';
+        const sortField = queryParams.sortBy || 'created_at';
         const sortOrder = queryParams.sortOrder === 'asc' ? 'ASC' : 'DESC';
 
         // 执行查询
@@ -621,8 +625,7 @@ async function queryMessages(configCode, queryParams) {
             messages: messages.map(msg => ({
                 ...msg,
                 quote_msg: msg.quote_msg ? JSON.parse(msg.quote_msg) : null,
-                create_time: msg.create_time ? msg.create_time.toISOString() : null,
-                received_at: msg.received_at ? msg.received_at.toISOString() : null
+                created_at: msg.created_at ? new Date(parseInt(msg.created_at) * 1000).toISOString() : null
             }))
         };
     } catch (error) {
@@ -654,7 +657,18 @@ async function markMessageAsRead(messageId, configCode) {
  */
 async function getMessageStats(configCode, timeRange = {}) {
     try {
-        const stats = await db.getMessageStats(configCode, timeRange);
+        // 构建时间范围查询条件
+        const queryConditions = {};
+        if (timeRange.startDate) {
+            queryConditions.startDate = new Date(timeRange.startDate);
+        }
+        if (timeRange.endDate) {
+            const end = new Date(timeRange.endDate);
+            end.setHours(23, 59, 59, 999);
+            queryConditions.endDate = end;
+        }
+        
+        const stats = await db.getMessageStats(configCode, queryConditions);
         return stats || {
             total_messages: 0,
             unread_count: 0,
