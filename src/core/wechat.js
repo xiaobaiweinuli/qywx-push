@@ -40,7 +40,7 @@ class WeChatService {
     async sendMessage(accessToken, agentid, touser, messageData) {
         const messageBody = {
             touser: Array.isArray(touser) ? touser.join('|') : touser,
-            agentid: agentid,
+            agentid: String(agentid), // 确保agentid是字符串格式
             ...this.buildMessageBody(messageData)
         };
 
@@ -151,4 +151,4 @@ class WeChatService {
     }
 }
 
-module.exports = WeChatService; 
+module.exports = WeChatService;
