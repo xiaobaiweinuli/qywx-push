@@ -38,21 +38,33 @@
         }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center p-4">
-    <div class="w-full max-w-4xl glass-card p-8 my-8">
+<body class="flex flex-col items-center justify-start p-4 py-8">
+    <div class="w-full max-w-6xl glass-card p-8 my-4">
         <header class="mb-8">
-            <div class="flex items-center justify-between">
-                <h1 class="text-3xl font-bold text-primary flex items-center gap-2">
-                    <i data-lucide="send" class="h-8 w-8"></i>
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h1 class="text-2xl md:text-3xl font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="send" class="h-6 md:h-8 w-6 md:w-8"></i>
                     消息发送测试
                 </h1>
-                <div class="flex gap-2">
-                    <a href="/public/enhanced-api-docs.html" class="btn btn-outline btn-sm">
-                        <i data-lucide="book" class="h-4 w-4 mr-1"></i>
-                        API文档
+                <div class="flex gap-2 flex-wrap justify-center md:justify-end">
+                    <a href="/public/message-sender.html" class="btn btn-sm btn-primary gap-0.5 px-3">
+                        <i data-lucide="send" class="h-3.5 w-3.5"></i>
+                        消息测试
                     </a>
-                    <a href="/" class="btn btn-outline btn-sm">
-                        <i data-lucide="arrow-left" class="h-4 w-4 mr-1"></i>
+                    <a href="/public/message-viewer.html" class="btn btn-sm btn-outline btn-info gap-0.5 px-3">
+                        <i data-lucide="search" class="h-3.5 w-3.5"></i>
+                        消息查询
+                    </a>
+                    <a href="/public/api-docs.html" class="btn btn-sm btn-outline btn-primary gap-0.5 px-3">
+                        <i data-lucide="book-open" class="h-3.5 w-3.5"></i>
+                        基础API
+                    </a>
+                    <a href="/public/enhanced-api-docs.html" class="btn btn-sm btn-outline btn-secondary gap-0.5 px-3">
+                        <i data-lucide="zap" class="h-3.5 w-3.5"></i>
+                        增强API
+                    </a>
+                    <a href="/" class="btn btn-sm btn-outline gap-0.5 px-3">
+                        <i data-lucide="arrow-left" class="h-3.5 w-3.5"></i>
                         返回首页
                     </a>
                 </div>
@@ -327,7 +339,7 @@
     <footer class="text-center text-sm text-base-content/60 mb-4">
         <p class="flex items-center justify-center gap-1">
             <i data-lucide="external-link" class="h-4 w-4"></i>
-            <a href="https://www.wangwangit.com/" target="_blank" class="hover:text-primary transition-colors">一只会飞的旺旺</a>
+            <a href="https://xingshuang.dpdns.org/" target="_blank" class="hover:text-primary transition-colors">星霜笔记</a>
         </p>
     </footer>
 

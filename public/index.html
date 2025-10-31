@@ -24,27 +24,57 @@
             background: linear-gradient(135deg, #e0f2fe 0%, #bef264 100%);
             min-height: 100vh;
         }
+        /* 配置详情溢出控制 */
+        #lookup-result, #result {
+            word-break: break-all;
+        }
+        #lookup-result code, #result code {
+            white-space: pre-wrap;
+            word-break: break-all;
+            display: block;
+            overflow-x: auto;
+            padding: 0.5rem;
+            background-color: #f3f4f6;
+            border-radius: 0.25rem;
+        }
+        #lookup-result .config-item, #result .config-item {
+            margin-bottom: 1rem;
+        }
+        #lookup-result .config-label, #result .config-label {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            display: block;
+        }
+        #lookup-result .config-value, #result .config-value {
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-break: break-all;
+        }
     </style>
 </head>
-<body class="flex flex-col items-center justify-center p-4">
-    <div class="w-full max-w-2xl glass-card p-8 my-8">
+<body class="flex flex-col items-center justify-start p-4 py-8">
+    <div class="w-full max-w-6xl glass-card p-8 my-4">
         <header class="mb-8">
-            <div class="flex items-center justify-between">
-                <h1 class="text-3xl font-bold text-primary flex items-center gap-2">
-                    <i data-lucide="bell-ring" class="h-8 w-8"></i>
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h1 class="text-2xl md:text-3xl font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="bell-ring" class="h-6 md:h-8 w-6 md:w-8"></i>
                     企业微信通知服务
                 </h1>
-                <div class="flex gap-2">
-                    <a href="/public/message-sender.html" class="btn btn-sm btn-primary gap-1">
-                        <i data-lucide="send" class="h-4 w-4"></i>
+                <div class="flex gap-2 flex-wrap justify-center md:justify-end">
+                    <a href="/public/message-sender.html" class="btn btn-sm btn-primary gap-0.5 px-3">
+                        <i data-lucide="send" class="h-3.5 w-3.5"></i>
                         消息测试
                     </a>
-                    <a href="/public/api-docs.html" class="btn btn-sm btn-outline btn-primary gap-1">
-                        <i data-lucide="book-open" class="h-4 w-4"></i>
+                    <a href="/public/message-viewer.html" class="btn btn-sm btn-outline btn-info gap-0.5 px-3">
+                        <i data-lucide="search" class="h-3.5 w-3.5"></i>
+                        消息查询
+                    </a>
+                    <a href="/public/api-docs.html" class="btn btn-sm btn-outline btn-primary gap-0.5 px-3">
+                        <i data-lucide="book-open" class="h-3.5 w-3.5"></i>
                         基础API
                     </a>
-                    <a href="/public/enhanced-api-docs.html" class="btn btn-sm btn-outline btn-secondary gap-1">
-                        <i data-lucide="zap" class="h-4 w-4"></i>
+                    <a href="/public/enhanced-api-docs.html" class="btn btn-sm btn-outline btn-secondary gap-0.5 px-3">
+                        <i data-lucide="zap" class="h-3.5 w-3.5"></i>
                         增强API
                     </a>
                 </div>
@@ -55,7 +85,7 @@
         </header>
 
         <!-- 第一步：生成回调URL -->
-        <div id="step1-container">
+        <div id="step1-container" class="mb-8">
             <div class="divider">第一步：生成回调URL（必须先完成）</div>
             <div class="alert alert-warning mb-4">
                 <i data-lucide="alert-triangle" class="h-5 w-5"></i>
@@ -65,7 +95,7 @@
                 </div>
             </div>
 
-            <form id="callbackForm" class="space-y-4">
+            <form id="callbackForm" class="space-y-4 max-w-2xl mx-auto">
                 <div class="form-control">
                     <label class="label font-medium">CorpID</label>
                     <input type="text" name="corpid" class="input input-bordered w-full" required placeholder="请输入企业微信CorpID">
@@ -94,14 +124,14 @@
         </div>
 
         <!-- 第二步：完善配置 -->
-        <div id="step2-container" class="hidden">
+        <div id="step2-container" class="hidden mb-8">
             <div class="divider">第二步：完善配置（配置IP白名单后）</div>
             <div class="alert alert-info mb-4">
                 <i data-lucide="info" class="h-5 w-5"></i>
                 <span>请先在企业微信后台配置回调URL和IP白名单，然后点击下方按钮获取成员列表</span>
             </div>
 
-            <form id="configForm" class="space-y-4">
+            <form id="configForm" class="space-y-4 max-w-2xl mx-auto">
                 <div class="form-control">
                     <label class="label font-medium">CorpSecret</label>
                     <input type="password" name="corpsecret" class="input input-bordered w-full" required placeholder="请输入CorpSecret">
@@ -133,22 +163,22 @@
         <!-- 查找配置区域 -->
         <div class="divider">查找已有配置</div>
         <div id="lookup-section">
-            <form id="lookupForm" class="space-y-4">
+            <form id="lookupForm" class="space-y-4 max-w-2xl mx-auto">
                 <div class="form-control">
                     <label class="label font-medium">配置Code</label>
-                    <div class="flex gap-2">
-                        <input type="text" name="code" class="input input-bordered flex-1" required placeholder="请输入配置Code">
-                        <button type="submit" class="btn btn-primary">
+                    <div class="flex flex-col sm:flex-row gap-2 min-w-0">
+                        <input type="text" name="code" class="input input-bordered w-full flex-1 min-w-0" required placeholder="请输入配置Code">
+                        <button type="submit" class="btn btn-primary sm:w-auto w-full min-w-[80px]">
                             <i data-lucide="search" class="h-5 w-5"></i>
                             查找
                         </button>
                     </div>
                 </div>
             </form>
-            <div id="lookup-result" class="mt-4"></div>
+            <div id="lookup-result" class="mt-4 overflow-x-auto min-w-full"></div>
         </div>
 
-        <div id="result" class="mt-8"></div>
+        <div id="result" class="mt-8 overflow-x-auto min-w-full"></div>
     </div>
 
     <!-- 提示弹窗 -->
@@ -162,7 +192,7 @@
     <footer class="text-center text-sm text-base-content/60 mb-4">
         <p class="flex items-center justify-center gap-1">
             <i data-lucide="external-link" class="h-4 w-4"></i>
-            <a href="https://www.wangwangit.com/" target="_blank" class="hover:text-primary transition-colors">一只会飞的旺旺</a>
+            <a href="https://xingshuang.dpdns.org/" target="_blank" class="hover:text-primary transition-colors">星霜笔记</a>
         </p>
     </footer>
 

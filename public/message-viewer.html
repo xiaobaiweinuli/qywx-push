@@ -1,0 +1,1043 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="garden">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息查询 - 企业微信通知服务</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- DaisyUI -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@3.5.0/dist/full.css" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- GSAP -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <style>
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 1rem;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
+        }
+        body {
+            background: linear-gradient(135deg, #e0f2fe 0%, #bef264 100%);
+            min-height: 100vh;
+        }
+        .message-item {
+            transition: all 0.3s ease;
+        }
+        .message-item:hover {
+            transform: translateY(-2px);
+        }
+        .message-unread {
+            background-color: rgba(224, 242, 254, 0.5);
+            border-left: 4px solid #3b82f6;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-start p-4 py-8">
+    <div class="w-full max-w-6xl glass-card p-8 my-4">
+        <header class="mb-8">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h1 class="text-2xl md:text-3xl font-bold text-primary flex items-center gap-2">
+                    <i data-lucide="search" class="h-6 md:h-8 w-6 md:w-8"></i>
+                    消息查询管理
+                </h1>
+                <div class="flex gap-2 flex-wrap justify-center md:justify-end">
+                    <a href="/public/message-sender.html" class="btn btn-sm btn-primary gap-0.5 px-3">
+                        <i data-lucide="send" class="h-3.5 w-3.5"></i>
+                        消息测试
+                    </a>
+                    <a href="/public/message-viewer.html" class="btn btn-sm btn-outline btn-info gap-0.5 px-3">
+                        <i data-lucide="search" class="h-3.5 w-3.5"></i>
+                        消息查询
+                    </a>
+                    <a href="/public/api-docs.html" class="btn btn-sm btn-outline btn-primary gap-0.5 px-3">
+                        <i data-lucide="book-open" class="h-3.5 w-3.5"></i>
+                        基础API
+                    </a>
+                    <a href="/public/enhanced-api-docs.html" class="btn btn-sm btn-outline btn-secondary gap-0.5 px-3">
+                        <i data-lucide="zap" class="h-3.5 w-3.5"></i>
+                        增强API
+                    </a>
+                    <a href="/" class="btn btn-sm btn-outline gap-0.5 px-3">
+                        <i data-lucide="arrow-left" class="h-3.5 w-3.5"></i>
+                        返回首页
+                    </a>
+                </div>
+            </div>
+            <p class="text-base-content/70 mt-2">查询和管理企业微信收到的消息</p>
+        </header>
+
+        <!-- 配置Code输入 -->
+        <div class="mb-6">
+            <div class="form-control">
+                <label class="label">
+                    <span class="label-text font-medium">配置Code</span>
+                </label>
+                <input type="text" id="config-code" class="input input-bordered" 
+                       placeholder="请输入您的配置Code">
+                <div class="label">
+                    <span class="label-text-alt text-base-content/60">从配置页面获取的唯一Code</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 查询条件 -->
+        <div class="bg-base-100 rounded-lg p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <i data-lucide="filter" class="h-5 w-5"></i>
+                查询条件
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- 日期范围 -->
+                <div class="form-control">
+                    <label class="label">开始日期</label>
+                    <input type="date" id="start-date" class="input input-bordered">
+                </div>
+                <div class="form-control">
+                    <label class="label">结束日期</label>
+                    <input type="date" id="end-date" class="input input-bordered">
+                </div>
+                
+                <!-- 消息类型 -->
+                <div class="form-control">
+                    <label class="label">消息类型</label>
+                    <select id="message-type" class="select select-bordered">
+                        <option value="">全部类型</option>
+                        <option value="text">文本消息</option>
+                        <option value="image">图片消息</option>
+                        <option value="voice">语音消息</option>
+                        <option value="video">视频消息</option>
+                        <option value="file">文件消息</option>
+                        <option value="location">位置消息</option>
+                        <option value="link">链接消息</option>
+                        <option value="event">事件消息</option>
+                    </select>
+                </div>
+                
+                <!-- 消息状态 -->
+                <div class="form-control">
+                    <label class="label">消息状态</label>
+                    <select id="message-status" class="select select-bordered">
+                        <option value="">全部状态</option>
+                        <option value="0">未读</option>
+                        <option value="1">已读</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- 搜索框 -->
+                <div class="mt-4 flex flex-col sm:flex-row gap-2">
+                    <div class="relative flex-1 min-w-0">
+                        <input type="text" id="search-keyword" class="input input-bordered pl-10 w-full" placeholder="搜索关键词...">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-base-content/50"></i>
+                    </div>
+                    <div class="flex gap-2 w-full sm:w-auto flex-wrap">
+                        <button id="search-btn" class="btn btn-primary gap-2 flex-1 sm:flex-initial min-w-[80px]">
+                            <i data-lucide="search" class="h-5 w-5"></i>
+                            查询
+                        </button>
+                        <button id="reset-btn" class="btn btn-outline gap-2 flex-1 sm:flex-initial min-w-[80px]">
+                            <i data-lucide="refresh-cw" class="h-5 w-5"></i>
+                            重置
+                        </button>
+                    </div>
+                </div>
+        </div>
+
+        <!-- API使用示例 -->
+        <div class="bg-base-100 rounded-lg p-6 shadow-sm mb-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center gap-2">
+                <i data-lucide="terminal" class="h-5 w-5"></i>
+                API使用示例
+            </h3>
+            
+            <div class="space-y-6">
+                <!-- 获取消息列表 -->
+                <div>
+                    <h4 class="font-medium mb-2 text-base">获取消息列表</h4>
+                    <div class="bg-base-200 p-3 rounded-md">
+                        <pre class="text-sm">curl -X GET "http://your-server.com/api/messages/your-code?page=1&pageSize=20&startDate=2023-01-01&endDate=2023-01-31"</pre>
+                    </div>
+                </div>
+                
+                <!-- 获取消息统计 -->
+                <div>
+                    <h4 class="font-medium mb-2 text-base">获取消息统计</h4>
+                    <div class="bg-base-200 p-3 rounded-md">
+                        <pre class="text-sm">curl -X GET "http://your-server.com/api/messages/your-code/stats"</pre>
+                    </div>
+                </div>
+                
+                <!-- 标记消息已读 -->
+                <div>
+                    <h4 class="font-medium mb-2 text-base">标记消息已读</h4>
+                    <div class="bg-base-200 p-3 rounded-md">
+                        <pre class="text-sm">curl -X POST "http://your-server.com/api/messages/your-code/message-id-123/read"</pre>
+                    </div>
+                </div>
+                
+                <!-- 批量标记已读 -->
+                <div>
+                    <h4 class="font-medium mb-2 text-base">批量标记已读</h4>
+                    <div class="bg-base-200 p-3 rounded-md">
+                        <pre class="text-sm">curl -X POST "http://your-server.com/api/messages/your-code/batch/read" \
+-H "Content-Type: application/json" \
+-d '{}'</pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 统计信息 -->
+        <div id="stats-container" class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 hidden">
+            <div class="stat bg-primary/5 rounded-lg p-4 border border-primary/20">
+                <div class="stat-title text-primary font-medium">总消息数</div>
+                <div class="stat-value text-3xl font-bold" id="total-count">0</div>
+            </div>
+            <div class="stat bg-secondary/5 rounded-lg p-4 border border-secondary/20">
+                <div class="stat-title text-secondary font-medium">未读消息</div>
+                <div class="stat-value text-3xl font-bold" id="unread-count">0</div>
+            </div>
+            <div class="stat bg-success/5 rounded-lg p-4 border border-success/20">
+                <div class="stat-title text-success font-medium">已读消息</div>
+                <div class="stat-value text-3xl font-bold" id="read-count">0</div>
+            </div>
+            <div class="stat bg-info/5 rounded-lg p-4 border border-info/20">
+                <div class="stat-title text-info font-medium">今日新增</div>
+                <div class="stat-value text-3xl font-bold" id="today-count">0</div>
+            </div>
+        </div>
+
+        <!-- 操作栏 -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+            <div class="flex gap-2">
+                <button id="mark-all-read" class="btn btn-outline btn-sm gap-1">
+                    <i data-lucide="check-square" class="h-4 w-4"></i>
+                    全部标为已读
+                </button>
+                <button id="export-btn" class="btn btn-outline btn-sm gap-1">
+                    <i data-lucide="download" class="h-4 w-4"></i>
+                    导出数据
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-medium">每页显示：</label>
+                <select id="page-size" class="select select-sm">
+                    <option value="10">10条</option>
+                    <option value="20" selected>20条</option>
+                    <option value="50">50条</option>
+                    <option value="100">100条</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 消息列表 -->
+        <div id="messages-container" class="overflow-auto max-h-[600px] mb-6">
+            <div class="loading-state hidden">
+                <div class="flex justify-center items-center py-12">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+            </div>
+            
+            <div id="empty-state" class="flex flex-col items-center justify-center py-16 text-center">
+                <i data-lucide="inbox" class="h-20 w-20 text-base-content/30 mb-4"></i>
+                <h3 class="text-lg font-medium mb-2">暂无消息数据</h3>
+                <p class="text-base-content/60 max-w-md">请输入配置Code并点击查询按钮，获取消息列表</p>
+            </div>
+            
+            <div id="messages-list" class="space-y-3 hidden">
+                <!-- 消息项将通过JavaScript动态插入 -->
+            </div>
+        </div>
+
+        <!-- 分页控制 -->
+        <div id="pagination" class="flex justify-between items-center mt-6 hidden">
+            <div class="text-sm text-base-content/60">
+                显示 <span id="start-item">0</span>-<span id="end-item">0</span> 条，共 <span id="total-items">0</span> 条
+            </div>
+            <div class="flex gap-1">
+                <button id="prev-page" class="pagination-btn btn btn-sm" disabled>
+                    <i data-lucide="chevron-left" class="h-4 w-4"></i>
+                </button>
+                <div id="page-numbers" class="flex gap-1">
+                    <!-- 页码按钮将通过JavaScript动态插入 -->
+                </div>
+                <button id="next-page" class="pagination-btn btn btn-sm" disabled>
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 消息详情模态框 -->
+    <div id="message-detail-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm"></div>
+        <div class="glass-card w-full max-w-2xl max-h-[80vh] overflow-auto relative z-10">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold" id="modal-title">消息详情</h3>
+                    <button id="close-modal" class="text-base-content/60 hover:text-base-content">
+                        <i data-lucide="x" class="h-6 w-6"></i>
+                    </button>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between">
+                        <span class="text-base-content/60">消息ID</span>
+                        <span id="detail-id" class="font-mono text-sm"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-base-content/60">发送者</span>
+                        <span id="detail-from"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-base-content/60">消息类型</span>
+                        <span id="detail-type"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-base-content/60">发送时间</span>
+                        <span id="detail-time"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-base-content/60">状态</span>
+                        <span id="detail-status"></span>
+                    </div>
+                    
+                    <div class="divider"></div>
+                    
+                    <div>
+                        <h4 class="font-medium mb-2">消息内容</h4>
+                        <div id="detail-content" class="bg-base-100 p-4 rounded-lg min-h-[100px]"></div>
+                    </div>
+                    
+                    <!-- 引用消息 -->
+                    <div id="quote-message-container" class="hidden">
+                        <h4 class="font-medium mb-2 text-base-content/80">引用消息</h4>
+                        <div id="quote-message" class="bg-base-100/80 p-3 rounded-lg border-l-4 border-primary/30 text-sm"></div>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end gap-2">
+                    <button id="mark-read-modal" class="btn btn-outline btn-sm">标记已读</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalItems = 0;
+        let currentMessages = [];
+
+        // DOM元素
+        const configCodeInput = document.getElementById('config-code');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+        const messageTypeSelect = document.getElementById('message-type');
+        const messageStatusSelect = document.getElementById('message-status');
+        const searchKeywordInput = document.getElementById('search-keyword');
+        const searchBtn = document.getElementById('search-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const messagesContainer = document.getElementById('messages-container');
+        const emptyState = document.getElementById('empty-state');
+        const messagesList = document.getElementById('messages-list');
+        const loadingState = document.querySelector('.loading-state');
+        const pagination = document.getElementById('pagination');
+        const prevPageBtn = document.getElementById('prev-page');
+        const nextPageBtn = document.getElementById('next-page');
+        const pageNumbersContainer = document.getElementById('page-numbers');
+        const startItemEl = document.getElementById('start-item');
+        const endItemEl = document.getElementById('end-item');
+        const totalItemsEl = document.getElementById('total-items');
+        const pageSizeSelect = document.getElementById('page-size');
+        const statsContainer = document.getElementById('stats-container');
+        const totalCountEl = document.getElementById('total-count');
+        const unreadCountEl = document.getElementById('unread-count');
+        const readCountEl = document.getElementById('read-count');
+        const todayCountEl = document.getElementById('today-count');
+        const markAllReadBtn = document.getElementById('mark-all-read');
+        const exportBtn = document.getElementById('export-btn');
+        
+        // 模态框相关
+        const messageDetailModal = document.getElementById('message-detail-modal');
+        const closeModalBtn = document.getElementById('close-modal');
+        const modalTitleEl = document.getElementById('modal-title');
+        const detailIdEl = document.getElementById('detail-id');
+        const detailFromEl = document.getElementById('detail-from');
+        const detailTypeEl = document.getElementById('detail-type');
+        const detailTimeEl = document.getElementById('detail-time');
+        const detailStatusEl = document.getElementById('detail-status');
+        const detailContentEl = document.getElementById('detail-content');
+        const quoteMessageContainer = document.getElementById('quote-message-container');
+        const quoteMessageEl = document.getElementById('quote-message');
+        const markReadModalBtn = document.getElementById('mark-read-modal');
+        let currentMessageId = null;
+
+        // 初始化
+        function init() {
+            // 设置默认日期范围（最近7天）
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 7);
+            
+            startDateInput.valueAsDate = startDate;
+            endDateInput.valueAsDate = endDate;
+            
+            // 事件监听
+            searchBtn.addEventListener('click', handleSearch);
+            resetBtn.addEventListener('click', handleReset);
+            pageSizeSelect.addEventListener('change', handlePageSizeChange);
+            prevPageBtn.addEventListener('click', goToPrevPage);
+            nextPageBtn.addEventListener('click', goToNextPage);
+            markAllReadBtn.addEventListener('click', handleMarkAllRead);
+            exportBtn.addEventListener('click', handleExport);
+            
+            // 模态框事件
+            closeModalBtn.addEventListener('click', closeModal);
+            markReadModalBtn.addEventListener('click', handleMarkReadInModal);
+            
+            // 点击模态框背景关闭
+            messageDetailModal.addEventListener('click', (e) => {
+                if (e.target === messageDetailModal) {
+                    closeModal();
+                }
+            });
+        }
+
+        // 处理搜索
+        function handleSearch() {
+            const configCode = configCodeInput.value.trim();
+            if (!configCode) {
+                showToast('请输入配置Code', 'error');
+                return;
+            }
+            
+            currentPage = 1;
+            fetchMessages();
+            fetchMessageStats();
+        }
+
+        // 处理重置
+        function handleReset() {
+            // 重置所有筛选条件
+            const endDate = new Date();
+            const startDate = new Date();
+            startDate.setDate(startDate.getDate() - 7);
+            
+            startDateInput.valueAsDate = startDate;
+            endDateInput.valueAsDate = endDate;
+            messageTypeSelect.value = '';
+            messageStatusSelect.value = '';
+            searchKeywordInput.value = '';
+        }
+
+        // 处理分页大小变化
+        function handlePageSizeChange() {
+            pageSize = parseInt(pageSizeSelect.value);
+            currentPage = 1;
+            fetchMessages();
+        }
+
+        // 上一页
+        function goToPrevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchMessages();
+            }
+        }
+
+        // 下一页
+        function goToNextPage() {
+            const totalPages = Math.ceil(totalItems / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                fetchMessages();
+            }
+        }
+
+        // 跳转到指定页码
+        function goToPage(page) {
+            currentPage = page;
+            fetchMessages();
+        }
+
+        // 获取消息列表
+        async function fetchMessages() {
+            const configCode = configCodeInput.value.trim();
+            if (!configCode) return;
+            
+            // 显示加载状态
+            showLoading();
+            
+            try {
+                // 构建查询参数
+                const queryParams = new URLSearchParams({
+                    page: currentPage,
+                    pageSize: pageSize,
+                    startDate: startDateInput.value || undefined,
+                    endDate: endDateInput.value || undefined,
+                    msgType: messageTypeSelect.value || undefined,
+                    isRead: messageStatusSelect.value || undefined,
+                    keyword: searchKeywordInput.value.trim() || undefined
+                });
+                
+                // 移除undefined参数
+                for (const [key, value] of queryParams.entries()) {
+                    if (value === 'undefined') {
+                        queryParams.delete(key);
+                    }
+                }
+                
+                const response = await fetch(`/api/messages/${configCode}?${queryParams}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showToast(data.error || '获取消息失败', 'error');
+                    hideLoading();
+                    return;
+                }
+                
+                currentMessages = data.data.messages || [];
+                totalItems = data.data.total || 0;
+                
+                renderMessages();
+                renderPagination();
+                
+                // 隐藏加载状态
+                hideLoading();
+                
+                // 如果有消息，隐藏空状态
+                if (currentMessages.length > 0) {
+                    emptyState.classList.add('hidden');
+                    messagesList.classList.remove('hidden');
+                    pagination.classList.remove('hidden');
+                } else {
+                    emptyState.classList.remove('hidden');
+                    messagesList.classList.add('hidden');
+                    pagination.classList.add('hidden');
+                }
+                
+            } catch (error) {
+                console.error('获取消息失败:', error);
+                showToast('获取消息失败，请稍后重试', 'error');
+                hideLoading();
+            }
+        }
+
+        // 获取消息统计
+        async function fetchMessageStats() {
+            const configCode = configCodeInput.value.trim();
+            if (!configCode) return;
+            
+            try {
+                const response = await fetch(`/api/messages/${configCode}/stats`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    console.error('获取统计失败:', data.error);
+                    return;
+                }
+                
+                const stats = data.data || {};
+                
+                // 更新统计数据
+                totalCountEl.textContent = stats.total || 0;
+                unreadCountEl.textContent = stats.unread || 0;
+                readCountEl.textContent = stats.read || 0;
+                todayCountEl.textContent = stats.today || 0;
+                
+                // 显示统计容器
+                statsContainer.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('获取统计失败:', error);
+            }
+        }
+
+        // 渲染消息列表
+        function renderMessages() {
+            messagesList.innerHTML = '';
+            
+            currentMessages.forEach(message => {
+                const messageItem = document.createElement('div');
+                messageItem.className = `message-item p-4 rounded-lg bg-base-100 shadow-sm cursor-pointer ${message.is_read ? '' : 'message-unread'}`;
+                
+                const formattedTime = formatDateTime(message.create_time);
+                const typeLabel = getMessageTypeLabel(message.msg_type);
+                
+                messageItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex items-center gap-2">
+                            <span class="inline-block w-2 h-2 rounded-full ${message.is_read ? 'bg-transparent' : 'bg-primary'}"></span>
+                            <span class="font-medium">${message.from_user || '未知用户'}</span>
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">${typeLabel}</span>
+                        </div>
+                        <span class="text-sm text-base-content/60">${formattedTime}</span>
+                    </div>
+                    <div class="mt-2 line-clamp-2 text-sm">
+                        ${getMessagePreview(message)}
+                    </div>
+                    <div class="mt-2 flex justify-between items-center">
+                        <span class="text-xs text-base-content/50">消息ID: ${message.message_id.substring(0, 8)}...</span>
+                        <span class="text-xs text-base-content/60">${message.is_read ? '已读' : '未读'}</span>
+                    </div>
+                `;
+                
+                messageItem.addEventListener('click', () => {
+                    showMessageDetail(message);
+                });
+                
+                messagesList.appendChild(messageItem);
+            });
+        }
+
+        // 获取消息预览
+        function getMessagePreview(message) {
+            switch (message.msg_type) {
+                case 'text':
+                    return message.content || '空消息';
+                case 'image':
+                    return '[图片消息]';
+                case 'voice':
+                    return '[语音消息]';
+                case 'video':
+                    return '[视频消息]';
+                case 'file':
+                    return `[文件] ${message.file_name || '未命名文件'}`;
+                case 'location':
+                    return '[位置消息]';
+                case 'link':
+                    return `[链接] ${message.title || '链接消息'}`;
+                case 'event':
+                    return `[事件] ${message.event_type || '未知事件'}`;
+                default:
+                    return `[${message.msg_type || '未知类型'}]`;
+            }
+        }
+
+        // 获取消息类型标签
+        function getMessageTypeLabel(type) {
+            const typeMap = {
+                'text': '文本',
+                'image': '图片',
+                'voice': '语音',
+                'video': '视频',
+                'file': '文件',
+                'location': '位置',
+                'link': '链接',
+                'event': '事件'
+            };
+            return typeMap[type] || type || '未知';
+        }
+
+        // 渲染分页
+        function renderPagination() {
+            const totalPages = Math.ceil(totalItems / pageSize);
+            const startItem = (currentPage - 1) * pageSize + 1;
+            const endItem = Math.min(currentPage * pageSize, totalItems);
+            
+            // 更新分页信息
+            startItemEl.textContent = totalItems > 0 ? startItem : 0;
+            endItemEl.textContent = totalItems > 0 ? endItem : 0;
+            totalItemsEl.textContent = totalItems;
+            
+            // 更新上一页/下一页按钮状态
+            prevPageBtn.disabled = currentPage <= 1;
+            nextPageBtn.disabled = currentPage >= totalPages;
+            
+            // 渲染页码按钮
+            pageNumbersContainer.innerHTML = '';
+            
+            // 计算显示的页码范围
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + 4);
+            
+            // 调整起始页码，确保始终显示5个页码
+            if (endPage - startPage < 4) {
+                startPage = Math.max(1, endPage - 4);
+            }
+            
+            // 添加首页按钮
+            if (startPage > 1) {
+                addPageButton(1);
+                if (startPage > 2) {
+                    addEllipsis();
+                }
+            }
+            
+            // 添加页码按钮
+            for (let i = startPage; i <= endPage; i++) {
+                addPageButton(i);
+            }
+            
+            // 添加末页按钮
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    addEllipsis();
+                }
+                addPageButton(totalPages);
+            }
+        }
+
+        // 添加页码按钮
+        function addPageButton(page) {
+            const button = document.createElement('button');
+            button.className = `pagination-btn btn btn-sm ${currentPage === page ? 'btn-primary' : 'btn-outline'}`;
+            button.textContent = page;
+            button.addEventListener('click', () => goToPage(page));
+            pageNumbersContainer.appendChild(button);
+        }
+
+        // 添加省略号
+        function addEllipsis() {
+            const ellipsis = document.createElement('span');
+            ellipsis.className = 'px-2 py-1 text-sm text-base-content/60';
+            ellipsis.textContent = '...';
+            pageNumbersContainer.appendChild(ellipsis);
+        }
+
+        // 显示消息详情
+        function showMessageDetail(message) {
+            currentMessageId = message.message_id;
+            
+            // 更新模态框内容
+            modalTitleEl.textContent = `消息详情 - ${getMessageTypeLabel(message.msg_type)}`;
+            detailIdEl.textContent = message.message_id;
+            detailFromEl.textContent = message.from_user || '未知用户';
+            detailTypeEl.textContent = getMessageTypeLabel(message.msg_type);
+            detailTimeEl.textContent = formatDateTime(message.create_time);
+            detailStatusEl.textContent = message.is_read ? '已读' : '未读';
+            
+            // 更新标记已读按钮状态
+            markReadModalBtn.disabled = message.is_read;
+            markReadModalBtn.textContent = message.is_read ? '已标记为已读' : '标记已读';
+            
+            // 更新内容展示
+            switch (message.msg_type) {
+                case 'text':
+                    detailContentEl.innerHTML = `<pre>${escapeHtml(message.content || '')}</pre>`;
+                    break;
+                case 'image':
+                    detailContentEl.innerHTML = '<div class="text-center py-4"><i data-lucide="image" class="h-16 w-16 text-base-content/30 mx-auto"></i><p class="mt-2 text-base-content/60">图片消息 - 媒体ID: ' + escapeHtml(message.media_id || '') + '</p></div>';
+                    break;
+                case 'voice':
+                    detailContentEl.innerHTML = '<div class="text-center py-4"><i data-lucide="mic" class="h-16 w-16 text-base-content/30 mx-auto"></i><p class="mt-2 text-base-content/60">语音消息 - 媒体ID: ' + escapeHtml(message.media_id || '') + '</p></div>';
+                    break;
+                case 'video':
+                    detailContentEl.innerHTML = '<div class="text-center py-4"><i data-lucide="film" class="h-16 w-16 text-base-content/30 mx-auto"></i><p class="mt-2 text-base-content/60">视频消息 - 媒体ID: ' + escapeHtml(message.media_id || '') + '</p></div>';
+                    break;
+                case 'file':
+                    detailContentEl.innerHTML = `<div class="text-center py-4"><i data-lucide="file" class="h-16 w-16 text-base-content/30 mx-auto"></i><p class="mt-2 font-medium">${escapeHtml(message.file_name || '未命名文件')}</p><p class="text-sm text-base-content/60">大小: ${formatFileSize(message.file_size || 0)}</p></div>`;
+                    break;
+                case 'location':
+                    detailContentEl.innerHTML = '<div class="text-center py-4"><i data-lucide="map-pin" class="h-16 w-16 text-base-content/30 mx-auto"></i><p class="mt-2 text-base-content/60">位置消息</p></div>';
+                    break;
+                case 'link':
+                    detailContentEl.innerHTML = `<div><p class="font-medium">${escapeHtml(message.title || '链接消息')}</p><p class="text-sm text-base-content/60 mt-1">${escapeHtml(message.description || '')}</p></div>`;
+                    break;
+                case 'event':
+                    detailContentEl.innerHTML = `<div><p class="font-medium">事件类型: ${escapeHtml(message.event_type || '未知事件')}</p><p class="text-sm text-base-content/60 mt-1">事件键值: ${escapeHtml(message.event_key || '')}</p></div>`;
+                    break;
+                default:
+                    detailContentEl.innerHTML = `<pre>${escapeHtml(JSON.stringify(message, null, 2))}</pre>`;
+            }
+            
+            // 处理引用消息
+            if (message.quote_msg) {
+                try {
+                    const quoteData = JSON.parse(message.quote_msg);
+                    quoteMessageContainer.classList.remove('hidden');
+                    quoteMessageEl.innerHTML = `<div class="text-sm"><span class="text-base-content/60">引用: </span>${escapeHtml(quoteData.content || '[引用消息内容]')}</div>`;
+                } catch (e) {
+                    quoteMessageContainer.classList.add('hidden');
+                }
+            } else {
+                quoteMessageContainer.classList.add('hidden');
+            }
+            
+            // 显示模态框
+            messageDetailModal.classList.remove('hidden');
+            // 防止背景滚动
+            document.body.style.overflow = 'hidden';
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            messageDetailModal.classList.add('hidden');
+            document.body.style.overflow = '';
+            currentMessageId = null;
+        }
+
+        // 标记消息已读
+        async function handleMarkReadInModal() {
+            if (!currentMessageId || !configCodeInput.value.trim()) return;
+            
+            try {
+                const response = await fetch(`/api/messages/${configCodeInput.value.trim()}/${currentMessageId}/read`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showToast(data.error || '标记已读失败', 'error');
+                    return;
+                }
+                
+                showToast('标记已读成功');
+                markReadModalBtn.disabled = true;
+                markReadModalBtn.textContent = '已标记为已读';
+                detailStatusEl.textContent = '已读';
+                
+                // 更新列表中的状态
+                fetchMessages();
+                fetchMessageStats();
+                
+            } catch (error) {
+                console.error('标记已读失败:', error);
+                showToast('标记已读失败，请稍后重试', 'error');
+            }
+        }
+
+        // 全部标记为已读
+        async function handleMarkAllRead() {
+            const configCode = configCodeInput.value.trim();
+            if (!configCode) {
+                showToast('请输入配置Code', 'error');
+                return;
+            }
+            
+            if (!confirm('确定要将所有消息标记为已读吗？')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/messages/${configCode}/batch/read`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showToast(data.error || '标记全部已读失败', 'error');
+                    return;
+                }
+                
+                showToast('全部标记已读成功');
+                fetchMessages();
+                fetchMessageStats();
+                
+            } catch (error) {
+                console.error('标记全部已读失败:', error);
+                showToast('标记全部已读失败，请稍后重试', 'error');
+            }
+        }
+
+        // 导出数据
+        async function handleExport() {
+            const configCode = configCodeInput.value.trim();
+            if (!configCode) {
+                showToast('请输入配置Code', 'error');
+                return;
+            }
+            
+            // 显示加载状态
+            showLoading();
+            
+            try {
+                // 构建查询参数（导出所有数据，不分页）
+                const queryParams = new URLSearchParams({
+                    startDate: startDateInput.value || undefined,
+                    endDate: endDateInput.value || undefined,
+                    msgType: messageTypeSelect.value || undefined,
+                    isRead: messageStatusSelect.value || undefined,
+                    keyword: searchKeywordInput.value.trim() || undefined,
+                    pageSize: 1000 // 导出较多数据
+                });
+                
+                // 移除undefined参数
+                for (const [key, value] of queryParams.entries()) {
+                    if (value === 'undefined') {
+                        queryParams.delete(key);
+                    }
+                }
+                
+                const response = await fetch(`/api/messages/${configCode}?${queryParams}`);
+                const data = await response.json();
+                
+                if (!data.success) {
+                    showToast(data.error || '导出失败', 'error');
+                    hideLoading();
+                    return;
+                }
+                
+                const messages = data.data.messages || [];
+                
+                // 构建CSV内容
+                const headers = ['消息ID', '发送者', '消息类型', '内容', '发送时间', '状态'];
+                const rows = messages.map(msg => [
+                    msg.message_id,
+                    msg.from_user || '未知',
+                    getMessageTypeLabel(msg.msg_type),
+                    msg.content || msg.file_name || '',
+                    formatDateTime(msg.create_time),
+                    msg.is_read ? '已读' : '未读'
+                ]);
+                
+                // 生成CSV
+                const csvContent = [headers, ...rows]
+                    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                    .join('\n');
+                
+                // 创建下载链接
+                const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `消息记录_${configCode}_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showToast('导出成功');
+                hideLoading();
+                
+            } catch (error) {
+                console.error('导出失败:', error);
+                showToast('导出失败，请稍后重试', 'error');
+                hideLoading();
+            }
+        }
+
+        // 显示加载状态
+        function showLoading() {
+            loadingState.classList.remove('hidden');
+            messagesList.classList.add('hidden');
+            emptyState.classList.add('hidden');
+        }
+
+        // 隐藏加载状态
+        function hideLoading() {
+            loadingState.classList.add('hidden');
+        }
+
+        // 工具函数：格式化日期时间
+        function formatDateTime(dateString) {
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '无效时间';
+            
+            const now = new Date();
+            const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                // 今天，只显示时间
+                return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            } else if (diffDays === 1) {
+                // 昨天
+                return '昨天 ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            } else if (diffDays < 7) {
+                // 一周内
+                const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                return weekdays[date.getDay()] + ' ' + date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+            } else {
+                // 超过一周，显示完整日期时间
+                return date.toLocaleString('zh-CN', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit',
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+        }
+
+        // 工具函数：格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 工具函数：HTML转义
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, m => map[m]);
+        }
+
+        // 显示提示信息
+        function showToast(message, type = 'success') {
+            // 检查是否已有toast，有则移除
+            const existingToast = document.querySelector('.toast-notification');
+            if (existingToast) {
+                existingToast.remove();
+            }
+            
+            // 创建toast元素
+            const toast = document.createElement('div');
+            toast.className = `toast-notification fixed top-4 right-4 px-4 py-3 rounded-lg shadow-lg transform transition-all duration-300 ease-in-out z-50 ${type === 'error' ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-green-50 text-green-600 border border-green-200'}`;
+            
+            const icon = document.createElement('i');
+            icon.className = `inline-block mr-2 h-5 w-5 ${type === 'error' ? 'data-lucide="alert-circle"' : 'data-lucide="check-circle"'}`;
+            
+            const textNode = document.createTextNode(message);
+            
+            toast.appendChild(icon);
+            toast.appendChild(textNode);
+            document.body.appendChild(toast);
+            
+            // 初始化图标
+            lucide.createIcons();
+            
+            // 动画效果
+            setTimeout(() => {
+                toast.classList.add('opacity-100');
+                toast.classList.remove('opacity-0');
+            }, 10);
+            
+            // 自动消失
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => {
+                    toast.remove();
+                }, 300);
+            }, 3000);
+        }
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', init);
+        
+        // 初始化Lucide图标
+        lucide.createIcons();
+    </script>
+    <footer class="text-center text-sm text-base-content/60 mb-4">
+        <p class="flex items-center justify-center gap-1">
+            <i data-lucide="external-link" class="h-4 w-4"></i>
+            <a href="https://xingshuang.dpdns.org/" target="_blank" class="hover:text-primary transition-colors">星霜笔记</a>
+        </p>
+    </footer>
+</body>
+</html>

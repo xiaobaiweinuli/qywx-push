@@ -37,7 +37,8 @@
     "multer": "^1.4.5-lts.1",
     "sqlite3": "^5.1.6",
     "uuid": "^9.0.0",
-    "wxcrypt": "^1.4.3"
+    "wxcrypt": "^1.4.3",
+    "xml2js": "^0.6.2"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"

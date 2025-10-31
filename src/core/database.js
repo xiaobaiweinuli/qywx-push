@@ -40,32 +40,122 @@ class Database {
     // 创建数据表
     async createTables() {
         return new Promise((resolve, reject) => {
-            const createTableSQL = `
-                CREATE TABLE IF NOT EXISTS configurations (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT UNIQUE NOT NULL,
-                    corpid TEXT NOT NULL,
-                    encrypted_corpsecret TEXT NOT NULL,
-                    agentid INTEGER NOT NULL,
-                    touser TEXT NOT NULL,
-                    description TEXT,
-                    callback_token TEXT,
-                    encrypted_encoding_aes_key TEXT,
-                    callback_enabled BOOLEAN DEFAULT 0,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(corpid, agentid, touser)
-                )
-            `;
+            this.db.serialize(() => {
+                // 创建configurations表
+                const createConfigTableSQL = `
+                    CREATE TABLE IF NOT EXISTS configurations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        code TEXT UNIQUE NOT NULL,
+                        corpid TEXT NOT NULL,
+                        encrypted_corpsecret TEXT NOT NULL,
+                        agentid INTEGER NOT NULL,
+                        touser TEXT NOT NULL,
+                        description TEXT,
+                        callback_token TEXT,
+                        encrypted_encoding_aes_key TEXT,
+                        callback_enabled BOOLEAN DEFAULT 0,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(corpid, agentid, touser)
+                    )
+                `;
 
-            this.db.run(createTableSQL, (err) => {
-                if (err) {
-                    console.error('创建表失败:', err.message);
-                    reject(err);
-                    return;
+                this.db.run(createConfigTableSQL, (err) => {
+                    if (err) {
+                        console.error('创建configurations表失败:', err.message);
+                        reject(err);
+                    }
+                });
+
+                // 创建received_messages表 - 支持引用关系和更多字段
+                const createMessagesTableSQL = `
+                    CREATE TABLE IF NOT EXISTS received_messages (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        message_id TEXT UNIQUE NOT NULL,
+                        
+                        -- 基础信息
+                        from_user TEXT NOT NULL,
+                        from_user_name TEXT,
+                        to_user TEXT,
+                        agent_id TEXT,
+                        
+                        -- 消息内容
+                        msg_type TEXT NOT NULL,
+                        content TEXT,
+                        
+                        -- 媒体相关
+                        media_id TEXT,
+                        pic_url TEXT,
+                        file_name TEXT,
+                        file_size INTEGER,
+                        
+                        -- 引用消息相关 (核心优化点)
+                        quote_msg_id TEXT,              -- 被引用的消息ID
+                        quote_content TEXT,              -- 被引用的消息内容
+                        quote_from_user TEXT,           -- 被引用消息的发送者
+                        quote_from_user_name TEXT,      -- 被引用消息发送者名称
+                        quote_msg_type TEXT,            -- 被引用消息类型
+                        
+                        -- 事件相关
+                        event_type TEXT,
+                        event_key TEXT,
+                        
+                        -- 时间戳
+                        created_at INTEGER NOT NULL,
+                        created_time TEXT NOT NULL,
+                        created_date TEXT NOT NULL,     -- YYYY-MM-DD 格式，便于按日期查询
+                        
+                        -- 索引标记
+                        is_reply INTEGER DEFAULT 0,     -- 是否是回复消息
+                        is_read INTEGER DEFAULT 0,      -- 是否已读（可用于未来功能）
+                        
+                        -- 外键约束
+                        FOREIGN KEY (quote_msg_id) REFERENCES received_messages(message_id)
+                    )
+                `;
+
+                this.db.run(createMessagesTableSQL, (err) => {
+                    if (err) {
+                        console.error('创建received_messages表失败:', err.message);
+                        reject(err);
+                    }
+                });
+
+                // 创建索引以提升查询性能
+                const createIndexesSQL = [
+                    `CREATE INDEX IF NOT EXISTS idx_from_user ON received_messages(from_user)`,
+                    `CREATE INDEX IF NOT EXISTS idx_created_at ON received_messages(created_at)`,
+                    `CREATE INDEX IF NOT EXISTS idx_created_date ON received_messages(created_date)`,
+                    `CREATE INDEX IF NOT EXISTS idx_msg_type ON received_messages(msg_type)`,
+                    `CREATE INDEX IF NOT EXISTS idx_quote_msg_id ON received_messages(quote_msg_id)`,
+                    `CREATE INDEX IF NOT EXISTS idx_composite ON received_messages(from_user, created_at)`
+                ];
+
+                createIndexesSQL.forEach((sql, index) => {
+                    this.db.run(sql, (err) => {
+                        if (err) {
+                            console.error(`创建索引失败 (${index + 1}):`, err.message);
+                        }
+                    });
+                });
+
+                // 创建全文搜索表 (支持内容搜索)
+                try {
+                    const createFtsTableSQL = `
+                        CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+                            message_id,
+                            content,
+                            quote_content,
+                            from_user_name
+                        )
+                    `;
+                    this.db.run(createFtsTableSQL);
+                } catch (err) {
+                    console.warn('创建全文搜索表失败 (SQLite版本可能不支持FTS5):', err.message);
                 }
-                console.log('数据表创建成功');
-                resolve();
             });
+
+            console.log('数据表创建成功');
+            resolve();
         });
     }
 
@@ -246,6 +336,422 @@ class Database {
             });
         }
     }
+
+    // 保存接收到的消息
+    async saveReceivedMessage(messageData) {
+        return new Promise((resolve, reject) => {
+            const date = new Date(messageData.createTime * 1000);
+            const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+            
+            // 检查是否是引用消息
+            const isReply = messageData.quoteMsg ? 1 : 0;
+            
+            const stmt = this.db.prepare(`
+                INSERT OR REPLACE INTO received_messages 
+                (
+                    message_id, from_user, from_user_name, to_user, agent_id,
+                    msg_type, content, media_id, pic_url, file_name, file_size,
+                    quote_msg_id, quote_content, quote_from_user, quote_from_user_name, quote_msg_type,
+                    event_type, event_key,
+                    created_at, created_time, created_date, is_reply
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `);
+            
+            stmt.run(
+                messageData.msgId || `msg_${Date.now()}`,
+                messageData.fromUser,
+                messageData.fromUserName || messageData.fromUser,
+                messageData.toUser,
+                messageData.agentId,
+                messageData.msgType,
+                messageData.content,
+                messageData.mediaId,
+                messageData.picUrl,
+                messageData.fileName,
+                messageData.fileSize,
+                messageData.quoteMsg?.msgId,
+                messageData.quoteMsg?.content,
+                messageData.quoteMsg?.fromUser,
+                messageData.quoteMsg?.fromUserName,
+                messageData.quoteMsg?.msgType,
+                messageData.eventType,
+                messageData.eventKey,
+                messageData.createTime,
+                date.toISOString(),
+                dateStr,
+                isReply
+            );
+            
+            stmt.finalize(async (err) => {
+                if (err) {
+                    console.error('保存消息失败:', err.message);
+                    reject(err);
+                } else {
+                    // 尝试同步到全文搜索表
+                    try {
+                        if (messageData.content || messageData.quoteMsg?.content) {
+                            await new Promise((resolveFts, rejectFts) => {
+                                this.db.run(`
+                                    INSERT INTO messages_fts (message_id, content, quote_content, from_user_name)
+                                    VALUES (?, ?, ?, ?)
+                                `, [
+                                    messageData.msgId,
+                                    messageData.content || '',
+                                    messageData.quoteMsg?.content || '',
+                                    messageData.fromUserName || ''
+                                ], (err) => {
+                                    if (err) {
+                                        console.warn('同步到全文搜索表失败:', err.message);
+                                        resolveFts(); // 不中断主流程
+                                    } else {
+                                        resolveFts();
+                                    }
+                                });
+                            });
+                        }
+                    } catch (ftsErr) {
+                        console.warn('全文搜索处理失败:', ftsErr.message);
+                    }
+                    resolve();
+                }
+            });
+        });
+    }
+
+    // 高级查询消息函数
+    async getReceivedMessages(filters = {}) {
+        return new Promise((resolve, reject) => {
+            let sql = `
+                SELECT 
+                    m.*,
+                    (SELECT COUNT(*) FROM received_messages WHERE quote_msg_id = m.message_id) as reply_count
+                FROM received_messages m
+                WHERE 1=1
+            `;
+            const params = [];
+            
+            // 按用户查询
+            if (filters.fromUser) {
+                sql += ' AND m.from_user = ?';
+                params.push(filters.fromUser);
+            }
+            
+            // 按消息类型查询
+            if (filters.msgType) {
+                sql += ' AND m.msg_type = ?';
+                params.push(filters.msgType);
+            }
+            
+            // 时间段查询 - 开始时间
+            if (filters.startTime) {
+                sql += ' AND m.created_at >= ?';
+                params.push(filters.startTime);
+            }
+            
+            // 时间段查询 - 结束时间
+            if (filters.endTime) {
+                sql += ' AND m.created_at <= ?';
+                params.push(filters.endTime);
+            }
+            
+            // 按日期查询 (YYYY-MM-DD)
+            if (filters.date) {
+                sql += ' AND m.created_date = ?';
+                params.push(filters.date);
+            }
+            
+            // 按日期范围查询
+            if (filters.startDate) {
+                sql += ' AND m.created_date >= ?';
+                params.push(filters.startDate);
+            }
+            
+            if (filters.endDate) {
+                sql += ' AND m.created_date <= ?';
+                params.push(filters.endDate);
+            }
+            
+            // 只查询引用消息
+            if (filters.onlyReplies) {
+                sql += ' AND m.is_reply = 1';
+            }
+            
+            // 查询某条消息的所有回复
+            if (filters.repliesTo) {
+                sql += ' AND m.quote_msg_id = ?';
+                params.push(filters.repliesTo);
+            }
+            
+            // 内容关键词搜索
+            if (filters.keyword) {
+                sql += ` AND (
+                    m.content LIKE ? OR 
+                    m.quote_content LIKE ? OR
+                    m.from_user_name LIKE ?
+                )`;
+                const keyword = `%${filters.keyword}%`;
+                params.push(keyword, keyword, keyword);
+            }
+            
+            // 排序方式
+            const orderBy = filters.orderBy || 'created_at';
+            const orderDir = filters.orderDir || 'DESC';
+            sql += ` ORDER BY m.${orderBy} ${orderDir}`;
+            
+            // 分页
+            const limit = filters.limit || 100;
+            const offset = filters.offset || 0;
+            sql += ' LIMIT ? OFFSET ?';
+            params.push(limit, offset);
+            
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    console.error('查询消息失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+    
+    // 获取符合条件的消息总数
+    async getReceivedMessagesCount(filters = {}) {
+        return new Promise((resolve, reject) => {
+            let sql = `
+                SELECT COUNT(*) as total
+                FROM received_messages m
+                WHERE 1=1
+            `;
+            const params = [];
+            
+            // 按用户查询
+            if (filters.fromUser) {
+                sql += ' AND m.from_user = ?';
+                params.push(filters.fromUser);
+            }
+            
+            // 按消息类型查询
+            if (filters.msgType) {
+                sql += ' AND m.msg_type = ?';
+                params.push(filters.msgType);
+            }
+            
+            // 时间段查询 - 开始时间
+            if (filters.startTime) {
+                sql += ' AND m.created_at >= ?';
+                params.push(filters.startTime);
+            }
+            
+            // 时间段查询 - 结束时间
+            if (filters.endTime) {
+                sql += ' AND m.created_at <= ?';
+                params.push(filters.endTime);
+            }
+            
+            // 按日期查询 (YYYY-MM-DD)
+            if (filters.date) {
+                sql += ' AND m.created_date = ?';
+                params.push(filters.date);
+            }
+            
+            // 按日期范围查询
+            if (filters.startDate) {
+                sql += ' AND m.created_date >= ?';
+                params.push(filters.startDate);
+            }
+            
+            if (filters.endDate) {
+                sql += ' AND m.created_date <= ?';
+                params.push(filters.endDate);
+            }
+            
+            // 只查询引用消息
+            if (filters.onlyReplies) {
+                sql += ' AND m.is_reply = 1';
+            }
+            
+            // 查询某条消息的所有回复
+            if (filters.repliesTo) {
+                sql += ' AND m.quote_msg_id = ?';
+                params.push(filters.repliesTo);
+            }
+            
+            // 内容关键词搜索
+            if (filters.keyword) {
+                sql += ` AND (
+                    m.content LIKE ? OR 
+                    m.quote_content LIKE ? OR
+                    m.from_user_name LIKE ?
+                )`;
+                const keyword = `%${filters.keyword}%`;
+                params.push(keyword, keyword, keyword);
+            }
+            
+            this.db.get(sql, params, (err, row) => {
+                if (err) {
+                    console.error('统计消息总数失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve(row ? row.total : 0);
+                }
+            });
+        });
+    }
+
+    // 获取消息的完整对话链
+    async getMessageThread(messageId) {
+        return new Promise((resolve, reject) => {
+            // 递归查询引用链
+            const sql = `
+                WITH RECURSIVE message_chain AS (
+                    -- 起始消息
+                    SELECT *, 0 as depth, message_id as root_id
+                    FROM received_messages
+                    WHERE message_id = ?
+                    
+                    UNION ALL
+                    
+                    -- 递归查找被引用的消息
+                    SELECT m.*, mc.depth + 1, mc.root_id
+                    FROM received_messages m
+                    INNER JOIN message_chain mc ON m.message_id = mc.quote_msg_id
+                )
+                SELECT * FROM message_chain
+                ORDER BY depth DESC, created_at ASC
+            `;
+            
+            this.db.all(sql, [messageId], (err, rows) => {
+                if (err) {
+                    console.error('查询对话链失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+
+    // 高级统计查询
+    async getMessageStats(filters = {}) {
+        return new Promise((resolve, reject) => {
+            let sql = `
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(CASE WHEN msg_type = 'text' THEN 1 END) as text_count,
+                    COUNT(CASE WHEN msg_type = 'image' THEN 1 END) as image_count,
+                    COUNT(CASE WHEN msg_type = 'file' THEN 1 END) as file_count,
+                    COUNT(CASE WHEN is_reply = 1 THEN 1 END) as reply_count,
+                    COUNT(DISTINCT from_user) as user_count,
+                    MIN(created_at) as first_message_time,
+                    MAX(created_at) as last_message_time
+                FROM received_messages
+                WHERE 1=1
+            `;
+            const params = [];
+            
+            if (filters.startDate) {
+                sql += ' AND created_date >= ?';
+                params.push(filters.startDate);
+            }
+            
+            if (filters.endDate) {
+                sql += ' AND created_date <= ?';
+                params.push(filters.endDate);
+            }
+            
+            if (filters.fromUser) {
+                sql += ' AND from_user = ?';
+                params.push(filters.fromUser);
+            }
+            
+            this.db.get(sql, params, (err, row) => {
+                if (err) {
+                    console.error('统计消息失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve(row || {
+                        total: 0,
+                        text_count: 0,
+                        image_count: 0,
+                        file_count: 0,
+                        reply_count: 0,
+                        user_count: 0,
+                        first_message_time: null,
+                        last_message_time: null
+                    });
+                }
+            });
+        });
+    }
+
+    // 按日期分组统计
+    async getMessagesByDate(filters = {}) {
+        return new Promise((resolve, reject) => {
+            let sql = `
+                SELECT 
+                    created_date,
+                    COUNT(*) as count,
+                    COUNT(DISTINCT from_user) as user_count,
+                    GROUP_CONCAT(DISTINCT msg_type) as msg_types
+                FROM received_messages
+                WHERE 1=1
+            `;
+            const params = [];
+            
+            if (filters.startDate) {
+                sql += ' AND created_date >= ?';
+                params.push(filters.startDate);
+            }
+            
+            if (filters.endDate) {
+                sql += ' AND created_date <= ?';
+                params.push(filters.endDate);
+            }
+            
+            sql += ' GROUP BY created_date ORDER BY created_date DESC';
+            
+            this.db.all(sql, params, (err, rows) => {
+                if (err) {
+                    console.error('按日期统计失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve(rows);
+                }
+            });
+        });
+    }
+
+    // 根据消息ID获取消息
+    async getMessageById(messageId) {
+        return new Promise((resolve, reject) => {
+            const sql = `SELECT * FROM received_messages WHERE message_id = ?`;
+            this.db.get(sql, [messageId], (err, row) => {
+                if (err) {
+                    console.error('根据ID查询消息失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+    }
+
+    // 更新消息已读状态
+    async markMessageAsRead(messageId) {
+        return new Promise((resolve, reject) => {
+            const sql = `UPDATE received_messages SET is_read = 1 WHERE message_id = ?`;
+            this.db.run(sql, [messageId], function(err) {
+                if (err) {
+                    console.error('标记消息已读失败:', err.message);
+                    reject(err);
+                } else {
+                    resolve({ updated: this.changes > 0 });
+                }
+            });
+        });
+    }
 }
 
-module.exports = Database; 
+module.exports = Database;

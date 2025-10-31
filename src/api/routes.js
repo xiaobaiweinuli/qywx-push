@@ -8,6 +8,27 @@ const WeChatService = require('../core/wechat');
 const router = express.Router();
 const wechat = new WeChatService();
 
+// 中间件：验证配置权限
+async function validateConfigAccess(req, res, next) {
+    try {
+        const { code } = req.params;
+        if (!code) {
+            return res.status(400).json({ error: '缺少配置代码' });
+        }
+        
+        const config = await notifier.getConfiguration(code);
+        if (!config) {
+            return res.status(404).json({ error: '配置不存在' });
+        }
+        
+        // 可选：添加更严格的权限验证（如API密钥）
+        req.config = config;
+        next();
+    } catch (error) {
+        res.status(500).json({ error: '权限验证失败', details: error.message });
+    }
+}
+
 // 配置文件上传
 const upload = multer({
     dest: 'uploads/',
@@ -111,6 +132,14 @@ router.get('/api/configuration/:code', async (req, res) => {
         if (!config) {
             return res.status(404).json({ error: '未找到配置' });
         }
+        
+        // 添加缓存控制头，确保不会返回304响应
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Last-Modified', new Date().toUTCString());
+        res.setHeader('ETag', `"${Date.now()}"`); // 使用时间戳作为ETag
+        
         res.json(config);
     } catch (err) {
         res.status(500).json({ error: err.message || '获取配置失败' });
@@ -307,6 +336,155 @@ router.get('/api/notify/:code/formats', (req, res) => {
             { type: 'news', name: '图文消息', endpoint: '/api/notify/:code/news', parameters: ['articles[]'] },
             { type: 'file', name: '文件消息', endpoint: '/api/notify/:code/file', parameters: ['file', 'fileType?'] },
             { type: 'image', name: '图片消息', endpoint: '/api/notify/:code/file', parameters: ['file', 'fileType=image'] }
+        ]
+    });
+});
+
+// ========== 消息管理API ==========
+
+/**
+ * 查询消息历史
+ * 支持多条件筛选、分页和排序
+ */
+router.get('/api/messages/:code', validateConfigAccess, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const queryParams = req.query;
+        
+        // 执行消息查询
+        const result = await notifier.queryMessages(code, queryParams);
+        
+        // 增强的缓存控制头，确保不会返回304响应
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Last-Modified', new Date().toUTCString());
+        res.setHeader('ETag', `"${Date.now()}"`); // 使用时间戳作为ETag
+        
+        res.json({
+            success: true,
+            data: result,
+            timestamp: Date.now() // 添加时间戳到响应中
+        });
+    } catch (error) {
+        console.error('❌ 消息查询失败:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message || '消息查询失败'
+        });
+    }
+});
+
+/**
+ * 获取消息统计信息
+ */
+router.get('/api/messages/:code/stats', validateConfigAccess, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const timeRange = req.query;
+        
+        const stats = await notifier.getMessageStats(code, timeRange);
+        
+        // 增强的缓存控制头，确保不会返回304响应
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Last-Modified', new Date().toUTCString());
+        res.setHeader('ETag', `"${Date.now()}"`); // 使用时间戳作为ETag
+        
+        res.json({
+            success: true,
+            data: stats,
+            timestamp: Date.now() // 添加时间戳到响应中
+        });
+    } catch (error) {
+        console.error('❌ 获取消息统计失败:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message || '获取消息统计失败'
+        });
+    }
+});
+
+/**
+ * 标记消息为已读
+ */
+router.patch('/api/messages/:code/:messageId/read', validateConfigAccess, async (req, res) => {
+    try {
+        const { code, messageId } = req.params;
+        
+        const success = await notifier.markMessageAsRead(messageId, code);
+        
+        if (success) {
+            res.json({
+                success: true,
+                message: '消息已标记为已读'
+            });
+        } else {
+            res.status(404).json({
+                success: false,
+                error: '消息不存在或无法更新'
+            });
+        }
+    } catch (error) {
+        console.error('❌ 标记消息已读失败:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message || '标记消息已读失败'
+        });
+    }
+});
+
+/**
+ * 批量标记消息为已读
+ */
+router.patch('/api/messages/:code/batch/read', validateConfigAccess, async (req, res) => {
+    try {
+        const { code } = req.params;
+        const { messageIds } = req.body;
+        
+        if (!Array.isArray(messageIds) || messageIds.length === 0) {
+            return res.status(400).json({
+                success: false,
+                error: '请提供有效的消息ID列表'
+            });
+        }
+        
+        // 批量处理（这里简化实现，可以在数据库层实现更高效的批量更新）
+        const results = await Promise.all(
+            messageIds.map(id => notifier.markMessageAsRead(id, code))
+        );
+        
+        const successCount = results.filter(r => r).length;
+        
+        res.json({
+            success: true,
+            message: `成功标记${successCount}/${messageIds.length}条消息为已读`
+        });
+    } catch (error) {
+        console.error('❌ 批量标记消息已读失败:', error);
+        res.status(400).json({
+            success: false,
+            error: error.message || '批量标记消息已读失败'
+        });
+    }
+});
+
+/**
+ * 获取支持的消息类型
+ */
+router.get('/api/messages/types', (req, res) => {
+    res.json({
+        success: true,
+        data: [
+            { type: 'text', name: '文本消息' },
+            { type: 'image', name: '图片消息' },
+            { type: 'voice', name: '语音消息' },
+            { type: 'video', name: '视频消息' },
+            { type: 'file', name: '文件消息' },
+            { type: 'news', name: '图文消息' },
+            { type: 'event', name: '事件消息' },
+            { type: 'link', name: '链接消息' }
         ]
     });
 });

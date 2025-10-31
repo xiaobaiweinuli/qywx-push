@@ -1,5 +1,5 @@
 // 统一通知服务 - 支持所有消息格式和回调功能
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid'); // 用于生成唯一ID
 const Database = require('../core/database');
 const CryptoService = require('../core/crypto');
 const WeChatService = require('../core/wechat');
@@ -374,7 +374,7 @@ async function handleCallbackVerification(code, msgSignature, timestamp, nonce, 
 }
 
 /**
- * 处理回调消息
+ * 处理回调消息并存储到数据库
  * @param {string} code - 唯一配置code
  * @param {string} encryptedData - 加密的消息数据
  * @param {string} msgSignature - 消息签名
@@ -419,10 +419,214 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
             console.log(`[回调消息] 内容: ${message.content}`);
         }
 
+        // 构建完整的消息对象，添加元数据
+        const fullMessage = {
+            message_id: message.msgId || uuidv4(), // 优先使用企业微信消息ID，没有则生成UUID
+            config_code: code,
+            from_user: message.fromUserName,
+            to_user: message.toUserName,
+            agent_id: message.agentId || config.agentid,
+            msg_type: message.msgType,
+            content: message.content,
+            media_id: message.mediaId,
+            file_name: message.fileName,
+            file_size: message.fileSize,
+            event_type: message.Event || message.event,
+            event_key: message.EventKey || message.eventKey,
+            quote_msg: message.quoteMsg ? JSON.stringify(message.quoteMsg) : null,
+            create_time: message.createTime ? new Date(message.createTime * 1000) : new Date(),
+            received_at: new Date(),
+            is_read: false
+        };
+
+        // 存储消息到数据库
+        try {
+            await db.saveReceivedMessage(fullMessage);
+            console.log(`✅ 消息已成功存储到数据库: ${fullMessage.message_id}`);
+            
+            // 异步更新消息统计
+            updateMessageStats(code, message.msgType).catch(err => {
+                console.error('❌ 更新消息统计失败:', err);
+            });
+        } catch (dbError) {
+            console.error('❌ 消息存储失败:', dbError);
+            // 数据库存储失败不应影响消息处理，继续执行
+        }
+
         return { success: true, message };
     } catch (error) {
         console.error('回调消息处理失败:', error.message);
+        // 记录失败消息的基本信息
+        try {
+            const errorMsg = {
+                config_code: code,
+                error_time: new Date(),
+                error_message: error.message,
+                raw_data: JSON.stringify(encryptedData).substring(0, 500) // 截断过长内容
+            };
+            console.error('📝 失败消息记录:', errorMsg);
+        } catch (logError) {
+            console.error('❌ 错误日志记录失败:', logError);
+        }
         return { success: false, error: error.message };
+    }
+}
+
+/**
+ * 异步更新消息统计信息
+ * @param {string} configCode - 配置代码
+ * @param {string} msgType - 消息类型
+ */
+async function updateMessageStats(configCode, msgType) {
+    try {
+        await db.updateMessageStats(configCode, msgType);
+    } catch (error) {
+        console.error('❌ 更新消息统计失败:', error);
+    }
+}
+
+/**
+ * 构建消息查询条件
+ * @param {Object} queryParams - 查询参数
+ * @returns {Object} 查询条件对象
+ */
+function buildMessageQuery(queryParams) {
+    const { startDate, endDate, msgType, fromUser, toUser, keyword, isRead } = queryParams;
+    const conditions = [];
+    const params = [];
+
+    if (startDate) {
+        conditions.push('create_time >= ?');
+        params.push(new Date(startDate));
+    }
+    if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        conditions.push('create_time <= ?');
+        params.push(end);
+    }
+    if (msgType) {
+        conditions.push('msg_type = ?');
+        params.push(msgType);
+    }
+    if (fromUser) {
+        conditions.push('from_user LIKE ?');
+        params.push(`%${fromUser}%`);
+    }
+    if (toUser) {
+        conditions.push('to_user LIKE ?');
+        params.push(`%${toUser}%`);
+    }
+    if (keyword) {
+        conditions.push('content LIKE ?');
+        params.push(`%${keyword}%`);
+    }
+    if (typeof isRead === 'boolean') {
+        conditions.push('is_read = ?');
+        params.push(isRead ? 1 : 0);
+    }
+
+    return { conditions, params };
+}
+
+/**
+ * 处理消息分页查询
+ * @param {string} configCode - 配置代码
+ * @param {Object} queryParams - 查询参数
+ * @returns {Promise<Object>} 查询结果和分页信息
+ */
+async function queryMessages(configCode, queryParams) {
+    try {
+        // 验证配置是否存在
+        const config = await db.getConfigurationByCode(configCode);
+        if (!config) {
+            throw new Error('配置不存在');
+        }
+
+        // 构建查询条件
+        const { conditions, params } = buildMessageQuery(queryParams);
+        
+        // 添加配置代码条件
+        conditions.push('config_code = ?');
+        params.push(configCode);
+
+        // 分页参数
+        const page = parseInt(queryParams.page) || 1;
+        const limit = parseInt(queryParams.limit) || 20;
+        const offset = (page - 1) * limit;
+
+        // 排序参数
+        const sortField = queryParams.sortBy || 'received_at';
+        const sortOrder = queryParams.sortOrder === 'asc' ? 'ASC' : 'DESC';
+
+        // 执行查询
+        const messages = await db.getReceivedMessages({
+            conditions,
+            params,
+            limit,
+            offset,
+            sortField,
+            sortOrder
+        });
+
+        // 获取总数
+        const total = await db.getReceivedMessagesCount({
+            conditions,
+            params
+        });
+
+        // 构建返回结果
+        return {
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+            messages: messages.map(msg => ({
+                ...msg,
+                quote_msg: msg.quote_msg ? JSON.parse(msg.quote_msg) : null,
+                create_time: msg.create_time ? msg.create_time.toISOString() : null,
+                received_at: msg.received_at ? msg.received_at.toISOString() : null
+            }))
+        };
+    } catch (error) {
+        console.error('❌ 消息查询失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 标记消息为已读
+ * @param {string} messageId - 消息ID
+ * @param {string} configCode - 配置代码
+ * @returns {Promise<boolean>} 是否成功
+ */
+async function markMessageAsRead(messageId, configCode) {
+    try {
+        return await db.markMessageAsRead(messageId, configCode);
+    } catch (error) {
+        console.error('❌ 标记消息已读失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 获取消息统计信息
+ * @param {string} configCode - 配置代码
+ * @param {Object} timeRange - 时间范围
+ * @returns {Promise<Object>} 统计信息
+ */
+async function getMessageStats(configCode, timeRange = {}) {
+    try {
+        const stats = await db.getMessageStats(configCode, timeRange);
+        return stats || {
+            total_messages: 0,
+            unread_count: 0,
+            by_type: {},
+            by_date: []
+        };
+    } catch (error) {
+        console.error('❌ 获取消息统计失败:', error);
+        throw error;
     }
 }
 
@@ -444,5 +648,10 @@ module.exports = {
     
     // 回调处理
     handleCallbackVerification,
-    handleCallbackMessage
+    handleCallbackMessage,
+    
+    // 消息管理和查询
+    queryMessages,
+    markMessageAsRead,
+    getMessageStats
 };
