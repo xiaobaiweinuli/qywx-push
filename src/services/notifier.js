@@ -200,15 +200,82 @@ async function sendNotification(code, title, content) {
  * @returns {Promise<Object>} - 企业微信API返回结果
  */
 async function sendEnhancedNotification(code, messageData) {
-    const config = await db.getConfigurationByCode(code);
-    if (!config) {
-        throw new Error('无效的code，未找到配置');
-    }
-
-    const corpsecret = crypto.decrypt(config.encrypted_corpsecret);
-    const accessToken = await wechat.getToken(config.corpid, corpsecret);
+    console.log('📤 开始发送增强通知...', {
+        code: code.substring(0, 8) + '...',
+        messageType: messageData.type,
+        hasContent: !!messageData.content || !!messageData.title || !!messageData.description || !!messageData.articles
+    });
     
-    return await wechat.sendMessage(accessToken, config.agentid, config.touser, messageData);
+    try {
+        console.log('🔍 查询配置信息...');
+        const config = await db.getConfigurationByCode(code);
+        if (!config) {
+            console.error('❌ 配置不存在:', code.substring(0, 8) + '...');
+            throw new Error('无效的code，未找到配置');
+        }
+        console.log('✅ 配置查询成功:', {
+            corpid: config.corpid,
+            agentid: config.agentid,
+            touser: config.touser.length > 20 ? config.touser.substring(0, 20) + '...' : config.touser
+        });
+
+        console.log('🔐 解密企业密钥...');
+        const corpsecret = crypto.decrypt(config.encrypted_corpsecret);
+        
+        console.log('🔑 获取访问令牌...');
+        const accessToken = await wechat.getToken(config.corpid, corpsecret);
+        console.log('✅ 获取访问令牌成功');
+        
+        console.log('📤 调用企业微信API发送消息...');
+        const result = await wechat.sendMessage(accessToken, config.agentid, config.touser, messageData);
+        console.log('✅ 消息发送API调用成功:', {
+            errcode: result.errcode,
+            errmsg: result.errmsg,
+            invaliduser: result.invaliduser,
+            invalidparty: result.invalidparty,
+            invalidtag: result.invalidtag
+        });
+        
+        // 发送成功后，创建消息记录并保存到数据库
+        if (result.errcode === 0) {
+            console.log('📝 准备创建消息记录...');
+            
+            // 构建消息记录对象
+            const messageRecord = {
+                message_id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                config_code: code,
+                from_user: 'system',
+                from_user_name: '系统发送',
+                to_user: config.touser,
+                agent_id: config.agentid,
+                msg_type: messageData.type,
+                content: messageData.content || 
+                         (messageData.title ? `${messageData.title}\n${messageData.description || ''}` : '') ||
+                         JSON.stringify(messageData.articles || [], null, 2).substring(0, 500),
+                media_id: messageData.media_id || null,
+                createTime: Math.floor(Date.now() / 1000),
+                is_read: 0
+            };
+            
+            try {
+                console.log('💾 保存消息记录到数据库...');
+                await db.saveReceivedMessage(messageRecord);
+                console.log('✅ 消息记录保存成功:', messageRecord.message_id);
+            } catch (dbError) {
+                console.error('❌ 保存消息记录失败:', dbError);
+                // 数据库保存失败不应影响API调用成功的返回
+            }
+        }
+        
+        return result;
+    } catch (error) {
+        console.error('❌ 发送增强通知失败:', {
+            error: error.message,
+            stack: error.stack,
+            code: code.substring(0, 8) + '...'
+        });
+        throw error;
+    }
 }
 
 /**
@@ -457,24 +524,25 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
         }
 
         // 构建完整的消息对象，添加元数据
-        const fullMessage = {
-            message_id: message.msgId || uuidv4(), // 优先使用企业微信消息ID，没有则生成UUID
-            config_code: code,
-            from_user: message.fromUserName,
-            to_user: message.toUserName,
-            agent_id: message.agentId || config.agentid,
-            msg_type: message.msgType,
-            content: message.content,
-            media_id: message.mediaId,
-            file_name: message.fileName,
-            file_size: message.fileSize,
-            event_type: message.Event || message.event,
-            event_key: message.EventKey || message.eventKey,
-            quote_msg: message.quoteMsg ? JSON.stringify(message.quoteMsg) : null,
-            create_time: message.createTime ? new Date(message.createTime * 1000) : new Date(),
-            received_at: new Date(),
-            is_read: false
-        };
+    const fullMessage = {
+        message_id: message.msgId || uuidv4(), // 优先使用企业微信消息ID，没有则生成UUID
+        config_code: code,
+        from_user: message.fromUserName,
+        from_user_name: message.fromUserName,
+        to_user: message.toUserName,
+        agent_id: message.agentId || config.agentid,
+        msg_type: message.msgType,
+        content: message.content || null,
+        media_id: message.mediaId || null,
+        pic_url: message.picUrl || null,
+        file_name: message.fileName || null,
+        file_size: message.fileSize || null,
+        event_type: message.Event || message.event || null,
+        event_key: message.EventKey || message.eventKey || null,
+        quoteMsg: message.quoteMsg || null,  // 直接传递对象
+        createTime: message.createTime || Math.floor(Date.now() / 1000),  // 使用时间戳
+        is_read: 0
+    };
 
         // 存储消息到数据库
         try {
@@ -533,18 +601,22 @@ function buildMessageQuery(queryParams) {
     const params = [];
 
     if (startDate) {
-        // 与getMessageStats保持一致，使用created_date字段和YYYY-MM-DD格式
-        conditions.push('created_date >= ?');
-        // 确保日期格式为YYYY-MM-DD
+        // 确保包含开始日期当天所有消息，包括带时间部分的记录
         const startDateStr = typeof startDate === 'string' ? startDate : startDate.toISOString().split('T')[0];
+        conditions.push('(created_date >= ? OR created_date LIKE ?)');
         params.push(startDateStr);
+        params.push(startDateStr + ' %'); // 匹配以日期开头且包含时间部分的记录
     }
     if (endDate) {
-        // 与getMessageStats保持一致，使用created_date字段和YYYY-MM-DD格式
-        conditions.push('created_date <= ?');
-        // 确保日期格式为YYYY-MM-DD
+        // 确保包含结束日期当天所有消息，包括带时间部分的记录
         const endDateStr = typeof endDate === 'string' ? endDate : endDate.toISOString().split('T')[0];
-        params.push(endDateStr);
+        // 计算结束日期的下一天，使用<比较确保包含结束日期当天所有消息
+        const endDateObj = new Date(endDateStr);
+        endDateObj.setDate(endDateObj.getDate() + 1);
+        const endDateNextDay = endDateObj.toISOString().split('T')[0];
+        conditions.push('(created_date < ? OR created_date LIKE ?)');
+        params.push(endDateNextDay);
+        params.push(endDateStr + ' %'); // 匹配以日期开头且包含时间部分的记录
     }
     if (msgType) {
         conditions.push('msg_type = ?');
@@ -577,30 +649,65 @@ function buildMessageQuery(queryParams) {
  * @returns {Promise<Object>} 查询结果和分页信息
  */
 async function queryMessages(configCode, queryParams) {
+    console.log('🔍 开始消息查询...', {
+        configCode: configCode.substring(0, 8) + '...',
+        queryParams: {
+            page: queryParams.page,
+            limit: queryParams.limit,
+            sortBy: queryParams.sortBy,
+            startDate: queryParams.startDate,
+            endDate: queryParams.endDate,
+            msgType: queryParams.msgType,
+            keyword: queryParams.keyword
+        }
+    });
+    
     try {
         // 验证配置是否存在
+        console.log('🔍 验证配置是否存在...');
         const config = await db.getConfigurationByCode(configCode);
         if (!config) {
+            console.error('❌ 配置不存在:', configCode.substring(0, 8) + '...');
             throw new Error('配置不存在');
         }
+        console.log('✅ 配置验证成功:', config.corpid);
 
         // 构建查询条件
+        console.log('📋 构建查询条件...');
         const { conditions, params } = buildMessageQuery(queryParams);
         
         // 添加配置代码条件
         conditions.push('config_code = ?');
         params.push(configCode);
+        
+        console.log('📋 查询条件详情:', {
+            conditions: conditions.join(' AND '),
+            paramCount: params.length,
+            sampleParams: params.map((p, i) => i === params.length - 1 ? configCode.substring(0, 8) + '...' : String(p))
+        });
 
         // 分页参数
         const page = parseInt(queryParams.page) || 1;
         const limit = parseInt(queryParams.limit) || 20;
         const offset = (page - 1) * limit;
+        
+        console.log('📄 分页参数:', {
+            page,
+            limit,
+            offset
+        });
 
         // 排序参数
         const sortField = queryParams.sortBy || 'created_at';
         const sortOrder = queryParams.sortOrder === 'asc' ? 'ASC' : 'DESC';
+        
+        console.log('🔀 排序参数:', {
+            field: sortField,
+            order: sortOrder
+        });
 
         // 执行查询
+        console.log('🔍 执行数据库消息查询...');
         const messages = await db.getReceivedMessages({
             conditions,
             params,
@@ -609,15 +716,20 @@ async function queryMessages(configCode, queryParams) {
             sortField,
             sortOrder
         });
+        
+        console.log('✅ 消息查询完成，返回', messages.length, '条消息');
 
         // 获取总数
+        console.log('🔢 获取符合条件的消息总数...');
         const total = await db.getReceivedMessagesCount({
             conditions,
             params
         });
+        
+        console.log('✅ 消息总数:', total);
 
         // 构建返回结果
-        return {
+        const result = {
             total,
             page,
             limit,
@@ -628,8 +740,21 @@ async function queryMessages(configCode, queryParams) {
                 created_at: msg.created_at ? new Date(parseInt(msg.created_at) * 1000).toISOString() : null
             }))
         };
+        
+        console.log('📊 最终查询结果:', {
+            total: result.total,
+            page: result.page,
+            totalPages: result.totalPages,
+            hasMessages: result.messages.length > 0
+        });
+        
+        return result;
     } catch (error) {
-        console.error('❌ 消息查询失败:', error);
+        console.error('❌ 消息查询失败:', {
+            error: error.message,
+            stack: error.stack,
+            configCode: configCode.substring(0, 8) + '...'
+        });
         throw error;
     }
 }
@@ -657,15 +782,16 @@ async function markMessageAsRead(messageId, configCode) {
  */
 async function getMessageStats(configCode, timeRange = {}) {
     try {
-        // 构建时间范围查询条件
+        // 构建时间范围查询条件，与queryMessages函数保持一致的日期处理逻辑
         const queryConditions = {};
         if (timeRange.startDate) {
-            queryConditions.startDate = new Date(timeRange.startDate);
+            queryConditions.startDate = timeRange.startDate;
         }
         if (timeRange.endDate) {
-            const end = new Date(timeRange.endDate);
-            end.setHours(23, 59, 59, 999);
-            queryConditions.endDate = end;
+            // 计算次日日期，与queryMessages函数保持一致的处理方式
+            const endDateObj = new Date(timeRange.endDate);
+            endDateObj.setDate(endDateObj.getDate() + 1);
+            queryConditions.endDate = endDateObj.toISOString().split('T')[0]; // 转换为YYYY-MM-DD格式
         }
         
         const stats = await db.getMessageStats(configCode, queryConditions);

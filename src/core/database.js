@@ -400,14 +400,43 @@ class Database {
 
     // 保存接收到的消息
     async saveReceivedMessage(messageData) {
+        console.log('📝 [DB] 开始保存消息流程...');
         return new Promise((resolve, reject) => {
-            // 确保创建时间正确处理
-            const createTime = messageData.create_time || messageData.createTime;
-            const date = new Date(createTime * 1000);
-            const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
-            
-            // 检查是否是引用消息
-            const isReply = messageData.quote_msg || messageData.quoteMsg ? 1 : 0;
+            try {
+                // 确保创建时间正确处理，转换为北京时间(UTC+8)
+                const createTime = messageData.createTime || Math.floor(Date.now() / 1000);
+                // 添加8小时偏移量转换为北京时间
+                const beijingTime = createTime * 1000 + 8 * 60 * 60 * 1000;
+                const date = new Date(beijingTime);
+                
+                // 生成北京时间戳（精确到秒）
+                const beijingTimestamp = Math.floor(beijingTime / 1000);
+                
+                // 生成包含完整时间信息的created_date（精确到秒）
+                const dateStr = date.toISOString().replace('Z', '').replace('T', ' ');
+                
+                // 生成北京时间的ISO字符串（精确到秒，不包含毫秒）
+                const isoTimeStr = date.toISOString().split('.')[0] + 'Z';
+                
+                // 检查是否是引用消息
+                const isReply = messageData.quoteMsg ? 1 : 0;
+                
+                console.log('💾 [DB] 准备保存消息:', {
+                    message_id: messageData.message_id || `msg_${Date.now()}`,
+                    config_code: messageData.config_code?.substring(0, 8) + '...',
+                    from_user: messageData.from_user || 'system',
+                    from_user_name: messageData.from_user_name || messageData.from_user,
+                    msg_type: messageData.msg_type || 'unknown',
+                    createTime: createTime,
+                    isReply: isReply
+                });
+                
+                console.log('📋 [DB] 消息内容预览:', {
+                    has_content: !!messageData.content,
+                    content_length: messageData.content ? messageData.content.length : 0,
+                    has_media: !!messageData.media_id,
+                    has_quote: !!messageData.quoteMsg
+                });
             
             const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO received_messages 
@@ -416,86 +445,123 @@ class Database {
                     msg_type, content, media_id, pic_url, file_name, file_size,
                     quote_msg_id, quote_content, quote_from_user, quote_from_user_name, quote_msg_type,
                     event_type, event_key,
-                    created_at, created_time, created_date, is_reply, received_at, is_read
+                    created_at, created_time, created_date, is_reply, is_read
                 )
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             
             stmt.run(
-                messageData.message_id || messageData.msgId || `msg_${Date.now()}`,
+                messageData.message_id || `msg_${Date.now()}`,
                 messageData.config_code || '',
-                messageData.from_user || messageData.fromUser,
-                messageData.from_user_name || messageData.fromUserName || messageData.from_user || messageData.fromUser,
-                messageData.to_user || messageData.toUser,
-                messageData.agent_id || messageData.agentId,
-                messageData.msg_type || messageData.msgType,
-                messageData.content,
-                messageData.media_id || messageData.mediaId,
-                messageData.pic_url || messageData.picUrl,
-                messageData.file_name || messageData.fileName,
-                messageData.file_size || messageData.fileSize,
-                messageData.quote_msg?.msgId || messageData.quoteMsg?.msgId,
-                messageData.quote_msg?.content || messageData.quoteMsg?.content,
-                messageData.quote_msg?.fromUser || messageData.quoteMsg?.fromUser,
-                messageData.quote_msg?.fromUserName || messageData.quoteMsg?.fromUserName,
-                messageData.quote_msg?.msgType || messageData.quoteMsg?.msgType,
-                messageData.event_type || messageData.eventType || messageData.Event || messageData.event,
-                messageData.event_key || messageData.eventKey || messageData.EventKey || messageData.eventKey,
-                createTime,
-                date.toISOString(),
+                messageData.from_user,
+                messageData.from_user_name || messageData.from_user,
+                messageData.to_user,
+                messageData.agent_id,
+                messageData.msg_type,
+                messageData.content || null,
+                messageData.media_id || null,
+                messageData.pic_url || null,
+                messageData.file_name || null,
+                messageData.file_size || null,
+                messageData.quoteMsg?.msgId || null,
+                messageData.quoteMsg?.content || null,
+                messageData.quoteMsg?.fromUser || null,
+                messageData.quoteMsg?.fromUserName || null,
+                messageData.quoteMsg?.msgType || null,
+                messageData.event_type || null,
+                messageData.event_key || null,
+                beijingTimestamp,
+                isoTimeStr,
                 dateStr,
                 isReply,
-                messageData.received_at || new Date().toISOString(),
-                messageData.is_read || 0
+                0
             );
             
             stmt.finalize(async (err) => {
-                if (err) {
-                    console.error('保存消息失败:', err.message);
-                    reject(err);
-                } else {
-                    // 尝试同步到全文搜索表
-                    try {
-                        if (messageData.content || messageData.quoteMsg?.content) {
-                            await new Promise((resolveFts, rejectFts) => {
-                                this.db.run(`
-                            INSERT INTO messages_fts (message_id, content, quote_content, from_user_name)
-                            VALUES (?, ?, ?, ?)
-                        `, [
-                            messageData.message_id || messageData.msgId || `msg_${Date.now()}`,
-                            messageData.content || '',
-                            messageData.quoteMsg?.content || '',
-                            messageData.fromUserName || ''
-                        ], (err) => {
-                                    if (err) {
-                                        console.warn('同步到全文搜索表失败:', err.message);
-                                        resolveFts(); // 不中断主流程
-                                    } else {
+                    if (err) {
+                        console.error('❌ [DB] 保存消息失败:', err.message);
+                        console.error('❌ [DB] 错误详情:', err);
+                        console.error('❌ [DB] 错误上下文:', {
+                            message_id: messageData.message_id || `msg_${Date.now()}`,
+                            config_code: messageData.config_code,
+                            createTime: createTime
+                        });
+                        reject(err);
+                    } else {
+                        console.log('✅ [DB] 消息保存成功!', {
+                            message_id: messageData.message_id || `msg_${Date.now()}`,
+                            config_code: messageData.config_code?.substring(0, 8) + '...',
+                            createTime: createTime
+                        });
+                        
+                        // 尝试同步到全文搜索表
+                        try {
+                            if (messageData.content || messageData.quoteMsg?.content) {
+                                console.log('🔍 [DB] 准备同步到全文搜索表...');
+                                await new Promise((resolveFts) => {
+                                    this.db.run(`
+                                        INSERT INTO messages_fts (message_id, content, quote_content, from_user_name)
+                                        VALUES (?, ?, ?, ?)
+                                    `, [
+                                        messageData.message_id || `msg_${Date.now()}`,
+                                        messageData.content || '',
+                                        messageData.quoteMsg?.content || '',
+                                        messageData.from_user_name || ''
+                                    ], (err) => {
+                                        if (err) {
+                                            console.warn('⚠️ [DB] 同步到全文搜索表失败:', err.message);
+                                        } else {
+                                            console.log('✅ [DB] 全文搜索同步成功');
+                                        }
                                         resolveFts();
-                                    }
+                                    });
                                 });
-                            });
+                            }
+                        } catch (ftsErr) {
+                            console.warn('⚠️ [DB] 全文搜索处理失败:', ftsErr.message);
                         }
-                    } catch (ftsErr) {
-                        console.warn('全文搜索处理失败:', ftsErr.message);
+                        resolve();
                     }
-                    resolve();
-                }
-            });
+                });
+            } catch (error) {
+                console.error('❌ [DB] 保存消息过程中发生异常:', error.message);
+                console.error('❌ [DB] 异常堆栈:', error.stack);
+                reject(error);
+            }
         });
     }
 
     // 高级查询消息函数
     async getReceivedMessages(filters = {}) {
+        console.log('🔍 [DB] 开始查询消息列表...');
+        console.log('📊 [DB] 查询过滤条件:', {
+            config_code: filters.config_code?.substring(0, 8) + '...',
+            fromUser: filters.fromUser,
+            msgType: filters.msgType,
+            startTime: filters.startTime,
+            endTime: filters.endTime,
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            keyword: filters.keyword,
+            has_conditions: !!filters.conditions?.length,
+            limit: filters.limit || 100,
+            offset: filters.offset || 0,
+            sortField: filters.sortField || filters.orderBy || 'created_at',
+            sortOrder: filters.sortOrder || filters.orderDir || 'DESC'
+        });
+        
         return new Promise((resolve, reject) => {
-            let sql = `
-                SELECT 
-                    m.*,
-                    (SELECT COUNT(*) FROM received_messages WHERE quote_msg_id = m.message_id) as reply_count
-                FROM received_messages m
-                WHERE 1=1
-            `;
-            const params = [];
+            try {
+                let sql = `
+                    SELECT 
+                        m.*,
+                        (SELECT COUNT(*) FROM received_messages WHERE quote_msg_id = m.message_id) as reply_count
+                    FROM received_messages m
+                    WHERE 1=1
+                `;
+                const params = [];
+                
+                console.log('📝 [DB] 开始构建查询SQL...');
             
             // 支持自定义条件和参数
             if (filters.conditions && filters.conditions.length > 0) {
@@ -542,13 +608,21 @@ class Database {
                 
                 // 按日期范围查询
                 if (filters.startDate) {
-                    sql += ' AND m.created_date >= ?';
+                    // 对于开始日期，确保包含整个当天的消息
+                    sql += ' AND (m.created_date >= ? OR m.created_date LIKE ?)';
                     params.push(filters.startDate);
+                    params.push(filters.startDate + ' %'); // 匹配以日期开头且包含时间部分的记录
                 }
                 
                 if (filters.endDate) {
-                    sql += ' AND m.created_date <= ?';
-                    params.push(filters.endDate);
+                    // 对于结束日期，确保包含整个当天的消息
+                    // 方法：查询created_date小于等于结束日期+1天的开始时间
+                    const endDatePlusOne = new Date(filters.endDate);
+                    endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+                    const endDateNextDay = endDatePlusOne.toISOString().split('T')[0];
+                    sql += ' AND (m.created_date < ? OR m.created_date LIKE ?)';
+                    params.push(endDateNextDay);
+                    params.push(filters.endDate + ' %'); // 匹配以日期开头且包含时间部分的记录
                 }
                 
                 // 只查询引用消息
@@ -585,26 +659,78 @@ class Database {
             sql += ' LIMIT ? OFFSET ?';
             params.push(limit, offset);
             
-            this.db.all(sql, params, (err, rows) => {
-                if (err) {
-                    console.error('查询消息失败:', err.message);
-                    reject(err);
-                } else {
-                    resolve(rows);
-                }
-            });
+                console.log('📋 [DB] 最终SQL语句预览:', sql.replace(/\s+/g, ' ').substring(0, 150) + '...');
+                console.log('📊 [DB] 查询参数数量:', params.length);
+                console.log('📊 [DB] 分页参数:', { limit: filters.limit || 100, offset: filters.offset || 0 });
+                
+                console.log('🔄 [DB] 执行数据库查询...');
+                this.db.all(sql, params, (err, rows) => {
+                    if (err) {
+                        console.error('❌ [DB] 查询消息失败:', {
+                            error: err.message,
+                            sql_preview: sql.substring(0, 100) + '...',
+                            param_count: params.length
+                        });
+                        reject(err);
+                    } else {
+                        console.log('✅ [DB] 查询成功完成!', {
+                            rows_returned: rows.length,
+                            has_data: rows.length > 0,
+                            first_message_id: rows.length > 0 ? rows[0].message_id : null,
+                            first_message_time: rows.length > 0 ? rows[0].created_at : null
+                        });
+                        
+                        // 记录第一条消息的详细信息，有助于调试
+                        if (rows.length > 0) {
+                            const firstRow = rows[0];
+                            console.log('📋 [DB] 第一条记录样本:', {
+                                message_id: firstRow.message_id,
+                                config_code: firstRow.config_code?.substring(0, 8) + '...',
+                                from_user: firstRow.from_user,
+                                msg_type: firstRow.msg_type,
+                                created_at: firstRow.created_at,
+                                created_date: firstRow.created_date,
+                                is_reply: firstRow.is_reply,
+                                reply_count: firstRow.reply_count
+                            });
+                        }
+                        
+                        resolve(rows);
+                    }
+                });
+            } catch (error) {
+                console.error('❌ [DB] 查询消息过程中发生异常:', error.message);
+                console.error('❌ [DB] 异常堆栈:', error.stack);
+                reject(error);
+            }
         });
     }
     
     // 获取符合条件的消息总数
     async getReceivedMessagesCount(filters = {}) {
+        console.log('🔢 [DB] 开始统计消息总数...');
+        console.log('📊 [DB] 统计过滤条件:', {
+            config_code: filters.config_code?.substring(0, 8) + '...',
+            fromUser: filters.fromUser,
+            msgType: filters.msgType,
+            startTime: filters.startTime,
+            endTime: filters.endTime,
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            keyword: filters.keyword,
+            has_conditions: !!filters.conditions?.length
+        });
+        
         return new Promise((resolve, reject) => {
-            let sql = `
-                SELECT COUNT(*) as total
-                FROM received_messages m
-                WHERE 1=1
-            `;
-            const params = [];
+            try {
+                let sql = `
+                    SELECT COUNT(*) as total
+                    FROM received_messages m
+                    WHERE 1=1
+                `;
+                const params = [];
+                
+                console.log('📝 [DB] 开始构建COUNT查询SQL...');
             
             // 支持自定义条件和参数
             if (filters.conditions && filters.conditions.length > 0) {
@@ -649,15 +775,19 @@ class Database {
                     params.push(filters.date);
                 }
                 
-                // 按日期范围查询
+                // 按日期范围查询 - 支持包含时间的created_date格式
                 if (filters.startDate) {
-                    sql += ' AND m.created_date >= ?';
+                    // 同时支持纯日期和带时间的格式
+                    sql += ' AND (m.created_date >= ? OR m.created_date LIKE ?)';
                     params.push(filters.startDate);
+                    params.push(filters.startDate + ' %'); // 匹配以该日期开头、包含时间的记录
                 }
                 
                 if (filters.endDate) {
-                    sql += ' AND m.created_date <= ?';
+                    // 使用<而不是<=，确保包含结束日期当天的所有记录
+                    sql += ' AND (m.created_date < ? OR m.created_date LIKE ?)';
                     params.push(filters.endDate);
+                    params.push(filters.endDate + ' %'); // 匹配以该日期开头、包含时间的记录
                 }
                 
                 // 只查询引用消息
@@ -683,14 +813,32 @@ class Database {
                 }
             }
             
-            this.db.get(sql, params, (err, row) => {
-                if (err) {
-                    console.error('统计消息总数失败:', err.message);
-                    reject(err);
-                } else {
-                    resolve(row ? row.total : 0);
-                }
-            });
+                console.log('📋 [DB] 最终COUNT SQL语句:', sql.replace(/\s+/g, ' '));
+                console.log('📊 [DB] COUNT查询参数数量:', params.length);
+                
+                console.log('🔄 [DB] 执行COUNT查询...');
+                this.db.get(sql, params, (err, row) => {
+                    if (err) {
+                        console.error('❌ [DB] 统计消息总数失败:', {
+                            error: err.message,
+                            sql_preview: sql.substring(0, 100) + '...',
+                            param_count: params.length
+                        });
+                        reject(err);
+                    } else {
+                        const total = row ? row.total : 0;
+                        console.log('✅ [DB] 统计成功完成!', {
+                            total_count: total,
+                            config_code: filters.config_code?.substring(0, 8) + '...'
+                        });
+                        resolve(total);
+                    }
+                });
+            } catch (error) {
+                console.error('❌ [DB] 统计消息过程中发生异常:', error.message);
+                console.error('❌ [DB] 异常堆栈:', error.stack);
+                reject(error);
+            }
         });
     }
 
@@ -752,14 +900,16 @@ class Database {
             sql += ' AND config_code = ?';
             params.push(configCode);
             
-            // 处理日期范围过滤
+            // 处理日期范围过滤 - 支持包含时间的created_date格式
             if (filters.startDate) {
                 // 确保日期格式正确 - 转换为YYYY-MM-DD格式
                 const startDateStr = typeof filters.startDate === 'string' ? 
                     filters.startDate : 
                     filters.startDate.toISOString().split('T')[0];
-                sql += ' AND created_date >= ?';
+                // 同时支持纯日期和带时间的格式
+                sql += ' AND (created_date >= ? OR created_date LIKE ?)';
                 params.push(startDateStr);
+                params.push(startDateStr + ' %'); // 匹配以该日期开头、包含时间的记录
             }
             
             if (filters.endDate) {
@@ -767,8 +917,14 @@ class Database {
                 const endDateStr = typeof filters.endDate === 'string' ? 
                     filters.endDate : 
                     filters.endDate.toISOString().split('T')[0];
-                sql += ' AND created_date <= ?';
-                params.push(endDateStr);
+                // 计算结束日期的下一天，使用<比较确保包含结束日期当天所有消息
+                const endDateObj = new Date(endDateStr);
+                endDateObj.setDate(endDateObj.getDate() + 1);
+                const endDateNextDay = endDateObj.toISOString().split('T')[0];
+                // 使用<而不是<=，确保包含结束日期当天的所有记录
+                sql += ' AND (created_date < ? OR created_date LIKE ?)';
+                params.push(endDateNextDay); // 使用下一天的日期作为<比较的参数
+                params.push(endDateStr + ' %'); // 匹配以该日期开头、包含时间的记录
             }
             
             if (filters.fromUser) {

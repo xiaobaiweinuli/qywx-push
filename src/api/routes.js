@@ -215,15 +215,35 @@ router.post('/api/callback/:code', async (req, res) => {
 router.post('/api/notify/:code/enhanced', async (req, res) => {
     const { code } = req.params;
     const messageData = req.body;
+    
+    // 详细日志：记录API调用
+    console.log('📥 收到API请求 - 增强版消息:', {
+        timestamp: new Date().toISOString(),
+        code: code.substring(0, 8) + '...', // 仅显示部分code保护隐私
+        method: req.method,
+        path: req.path,
+        messageType: messageData.type,
+        hasContent: !!messageData.content || !!messageData.title || !!messageData.description
+    });
 
     if (!messageData.type) {
+        console.error('❌ 请求参数错误：缺少消息类型(type)参数');
         return res.status(400).json({ error: '缺少消息类型(type)参数' });
     }
 
     try {
+        console.log('🔄 准备发送增强版消息...');
         const result = await notifier.sendEnhancedNotification(code, messageData);
+        console.log('✅ 增强版消息发送成功，API返回结果:', {
+            errcode: result.errcode,
+            errmsg: result.errmsg
+        });
         res.json({ message: '发送成功', response: result, messageType: messageData.type });
     } catch (err) {
+        console.error('❌ 增强版消息发送失败:', {
+            error: err.message,
+            code: code.substring(0, 8) + '...'
+        });
         res.status(err.message?.includes('未找到配置') ? 404 : 500)
            .json({ error: err.message || '消息发送失败' });
     }
@@ -294,18 +314,42 @@ router.post('/api/notify/:code/news', async (req, res) => {
 router.post('/api/notify/:code/file', upload.single('file'), async (req, res) => {
     const { code } = req.params;
     const { fileType = 'file' } = req.body;
+    
+    // 详细日志：记录文件上传请求
+    console.log('📥 收到API请求 - 文件上传:', {
+        timestamp: new Date().toISOString(),
+        code: code.substring(0, 8) + '...',
+        method: req.method,
+        path: req.path,
+        fileType: fileType,
+        hasFile: !!req.file
+    });
 
     if (!req.file) {
+        console.error('❌ 请求参数错误：未提供文件');
         return res.status(400).json({ error: '请上传文件' });
     }
+    
+    console.log('📄 文件信息:', {
+        originalname: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        path: req.file.path
+    });
 
     try {
+        console.log('🔄 准备发送文件消息...');
         const result = await notifier.sendFile(code, req.file.path, fileType);
+        console.log('✅ 文件消息发送成功，API返回结果:', {
+            errcode: result.errcode,
+            errmsg: result.errmsg
+        });
         
         // 清理临时文件
         const fs = require('fs');
         fs.unlink(req.file.path, (err) => {
             if (err) console.error('清理临时文件失败:', err);
+            else console.log('✅ 临时文件已清理');
         });
 
         res.json({ 
@@ -315,10 +359,16 @@ router.post('/api/notify/:code/file', upload.single('file'), async (req, res) =>
             fileSize: req.file.size
         });
     } catch (err) {
+        console.error('❌ 文件消息发送失败:', {
+            error: err.message,
+            code: code.substring(0, 8) + '...'
+        });
+        
         // 清理临时文件
         const fs = require('fs');
         fs.unlink(req.file.path, (cleanupErr) => {
             if (cleanupErr) console.error('清理临时文件失败:', cleanupErr);
+            else console.log('✅ 临时文件已清理');
         });
 
         res.status(err.message?.includes('未找到配置') ? 404 : 500)
@@ -351,8 +401,33 @@ router.get('/api/messages/:code', validateConfigAccess, async (req, res) => {
         const { code } = req.params;
         const queryParams = req.query;
         
+        // 详细日志：记录消息查询请求
+        console.log('📥 收到API请求 - 消息查询:', {
+            timestamp: new Date().toISOString(),
+            code: code.substring(0, 8) + '...',
+            method: req.method,
+            path: req.path,
+            queryParams: {
+                page: queryParams.page,
+                pageSize: queryParams.pageSize,
+                startDate: queryParams.startDate,
+                endDate: queryParams.endDate,
+                msgType: queryParams.msgType,
+                keyword: queryParams.keyword
+            }
+        });
+        
         // 执行消息查询
+        console.log('🔄 执行消息查询...');
         const result = await notifier.queryMessages(code, queryParams);
+        
+        // 详细日志：查询结果
+        console.log('✅ 消息查询完成:', {
+            totalMessages: result.total,
+            page: result.page,
+            limit: result.limit,
+            hasMessages: result.messages && result.messages.length > 0
+        });
         
         // 增强的缓存控制头，确保不会返回304响应
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -367,7 +442,11 @@ router.get('/api/messages/:code', validateConfigAccess, async (req, res) => {
             timestamp: Date.now() // 添加时间戳到响应中
         });
     } catch (error) {
-        console.error('❌ 消息查询失败:', error);
+        console.error('❌ 消息查询失败:', {
+            error: error.message,
+            stack: error.stack,
+            code: code.substring(0, 8) + '...'
+        });
         res.status(400).json({
             success: false,
             error: error.message || '消息查询失败'
