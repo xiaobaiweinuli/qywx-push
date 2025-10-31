@@ -260,6 +260,8 @@
                 <!-- 消息项将通过JavaScript动态插入 -->
             </div>
         </div>
+        
+        <!-- 调试信息区域已移除 -->
 
         <!-- 分页控制 -->
         <div id="pagination" class="flex justify-between items-center mt-6 hidden">
@@ -387,6 +389,7 @@
         let currentMessageId = null;
 
         // 初始化
+        
         function init() {
             // 设置默认日期范围（最近7天）
             const endDate = new Date();
@@ -415,6 +418,15 @@
                     closeModal();
                 }
             });
+            
+            // 调试信息显示/隐藏切换
+            const debugToggle = document.getElementById('debug-toggle');
+            const debugContent = document.getElementById('debug-content');
+            if (debugToggle && debugContent) {
+                debugToggle.addEventListener('click', () => {
+                    debugContent.classList.toggle('hidden');
+                });
+            }
         }
 
         // 处理搜索
@@ -424,6 +436,25 @@
                 showToast('请输入配置Code', 'error');
                 return;
             }
+            
+            // 验证和修正日期范围
+            const today = new Date();
+            let startDate = startDateInput.value ? new Date(startDateInput.value) : new Date();
+            let endDate = endDateInput.value ? new Date(endDateInput.value) : new Date();
+            
+            // 只检查开始日期是否晚于结束日期，不再限制未来日期
+            if (startDate > endDate) {
+
+                // 交换开始和结束日期
+                const temp = startDate;
+                startDate = endDate;
+                endDate = temp;
+                
+                startDateInput.value = startDate.toISOString().split('T')[0];
+                endDateInput.value = endDate.toISOString().split('T')[0];
+            }
+            
+            
             
             currentPage = 1;
             fetchMessages();
@@ -437,11 +468,14 @@
             const startDate = new Date();
             startDate.setDate(startDate.getDate() - 7);
             
-            startDateInput.valueAsDate = startDate;
-            endDateInput.valueAsDate = endDate;
+            // 确保日期格式正确
+            startDateInput.value = startDate.toISOString().split('T')[0];
+            endDateInput.value = endDate.toISOString().split('T')[0];
             messageTypeSelect.value = '';
             messageStatusSelect.value = '';
             searchKeywordInput.value = '';
+            
+            
         }
 
         // 处理分页大小变化
@@ -484,34 +518,131 @@
             
             try {
                 // 构建查询参数
-                const queryParams = new URLSearchParams({
-                    page: currentPage,
-                    pageSize: pageSize,
-                    startDate: startDateInput.value || undefined,
-                    endDate: endDateInput.value || undefined,
-                    msgType: messageTypeSelect.value || undefined,
-                    isRead: messageStatusSelect.value || undefined,
-                    keyword: searchKeywordInput.value.trim() || undefined
-                });
+                const queryParams = new URLSearchParams();
+                queryParams.append('page', currentPage);
+                queryParams.append('pageSize', pageSize);
                 
-                // 移除undefined参数
-                for (const [key, value] of queryParams.entries()) {
-                    if (value === 'undefined') {
-                        queryParams.delete(key);
-                    }
+                // 只添加非空的查询参数
+                if (startDateInput.value) {
+                    queryParams.append('startDate', startDateInput.value);
+
+                }
+                if (endDateInput.value) {
+                    queryParams.append('endDate', endDateInput.value);
+
+                }
+                if (messageTypeSelect.value && messageTypeSelect.value !== '') {
+                    queryParams.append('msgType', messageTypeSelect.value);
+
+                }
+                // 注意：不添加isRead参数，因为它可能导致过滤掉所有消息
+                if (searchKeywordInput.value.trim()) {
+                    queryParams.append('keyword', searchKeywordInput.value.trim());
+
                 }
                 
-                const response = await fetch(`/api/messages/${configCode}?${queryParams}`);
+                const queryString = queryParams.toString();
+                const apiUrl = `/api/messages/${configCode}?${queryString}`;
+                
+                
+                // 输出查询参数到调试区域
+                const queryInfo = {
+                    url: apiUrl,
+                    dateRange: {
+                        start: startDateInput.value,
+                        end: endDateInput.value
+                    },
+                    currentPage: currentPage,
+                    pageSize: pageSize
+                };
+                
+                
+                const response = await fetch(`/api/messages/${configCode}?${queryString}`);
                 const data = await response.json();
                 
-                if (!data.success) {
-                    showToast(data.error || '获取消息失败', 'error');
-                    hideLoading();
-                    return;
+                // 详细调试日志
+                
+                
+                // 输出API响应到调试区域
+                
+                
+                // 处理不同的数据结构
+                let messages = [];
+                let total = 0;
+                
+                if (data.success && data.data) {
+                    // 标准响应格式
+                    messages = data.data.messages || [];
+                    total = data.data.total || 0;
+
+                } else if (Array.isArray(data)) {
+                    // 可能直接返回了消息数组
+                    messages = data;
+                    total = data.length;
+
+                } else if (data.data && Array.isArray(data.data)) {
+                    // 可能data.data直接是消息数组
+                    messages = data.data;
+                    total = data.data.length;
+
+                } else {
+
+                    messages = data.data?.messages || [];
+                    total = data.data?.total || 0;
                 }
                 
-                currentMessages = data.data.messages || [];
-                totalItems = data.data.total || 0;
+                currentMessages = messages;
+                totalItems = total;
+                
+                
+                
+                // 输出处理后数据到调试区域
+                const processedInfo = {
+                    messageCount: currentMessages.length,
+                    totalCount: totalItems,
+                    hasMessages: currentMessages.length > 0
+                };
+                
+                
+                // 如果API返回的total为0但统计显示有消息，尝试不带日期范围查询
+                if (total === 0 && parseInt(totalCountEl.textContent) > 0 && (startDateInput.value || endDateInput.value)) {
+
+                    
+                    // 保存当前日期范围
+                    const savedStartDate = startDateInput.value;
+                    const savedEndDateInput = endDateInput.value;
+                    
+                    // 临时移除日期范围
+                    startDateInput.value = '';
+                    endDateInput.value = '';
+                    
+                    // 重新构建查询参数
+                    const retryParams = new URLSearchParams();
+                    retryParams.append('page', currentPage);
+                    retryParams.append('pageSize', pageSize);
+                    
+                    const retryQueryString = retryParams.toString();
+
+                    
+                    const retryResponse = await fetch(`/api/messages/${configCode}?${retryQueryString}`);
+                    const retryData = await retryResponse.json();
+                    
+
+                    
+                    // 解析重试响应
+                    if (retryData.success && retryData.data) {
+                        messages = retryData.data.messages || [];
+                        total = retryData.data.total || 0;
+    
+                    }
+                    
+                    // 恢复日期范围
+                    startDateInput.value = savedStartDate;
+                    endDateInput.value = savedEndDateInput;
+                    
+                    currentMessages = messages;
+                    totalItems = total;
+                }
                 
                 renderMessages();
                 renderPagination();
@@ -543,21 +674,52 @@
             if (!configCode) return;
             
             try {
-                const response = await fetch(`/api/messages/${configCode}/stats`);
-                const data = await response.json();
-                
-                if (!data.success) {
-                    console.error('获取统计失败:', data.error);
-                    return;
+                // 构建查询参数，包含日期范围
+                const queryParams = new URLSearchParams();
+                if (startDateInput.value) {
+                    queryParams.append('startDate', startDateInput.value);
+                }
+                if (endDateInput.value) {
+                    queryParams.append('endDate', endDateInput.value);
                 }
                 
-                const stats = data.data || {};
+                const queryString = queryParams.toString();
+                const url = queryString ? `/api/messages/${configCode}/stats?${queryString}` : `/api/messages/${configCode}/stats`;
+                const response = await fetch(url);
+                const data = await response.json();
+
+                
+                // 调试日志
+
+                
+                let stats = { total: 0, unread: 0, read: 0, today: 0 };
+                
+                // 处理不同的数据结构
+                if (data.success && data.data) {
+                    // 从后端获取的原始数据
+                    const rawData = data.data;
+                    
+                    // 构建规范化的统计数据对象
+                    // 处理新版后端返回的字段名映射
+                    stats = {
+                        total: rawData.total || rawData.total_messages || 0,
+                        unread: rawData.unread_count || rawData.unread || 0,
+                        read: rawData.read_count || rawData.read || 0,
+                        today: rawData.today_count || rawData.today || 0
+                    };
+                }
                 
                 // 更新统计数据
-                totalCountEl.textContent = stats.total || 0;
-                unreadCountEl.textContent = stats.unread || 0;
-                readCountEl.textContent = stats.read || 0;
-                todayCountEl.textContent = stats.today || 0;
+                totalCountEl.textContent = stats.total;
+                unreadCountEl.textContent = stats.unread;
+                readCountEl.textContent = stats.read;
+                todayCountEl.textContent = stats.today;
+                
+                const displayedStats = { total: String(stats.total), unread: String(stats.unread), read: String(stats.read), today: String(stats.today) };
+
+                
+                // 输出统计数据到调试区域
+
                 
                 // 显示统计容器
                 statsContainer.classList.remove('hidden');
@@ -575,7 +737,8 @@
                 const messageItem = document.createElement('div');
                 messageItem.className = `message-item p-4 rounded-lg bg-base-100 shadow-sm cursor-pointer ${message.is_read ? '' : 'message-unread'}`;
                 
-                const formattedTime = formatDateTime(message.create_time);
+                // 支持多种时间字段名（createTime 或 create_time）
+                const formattedTime = message.created_date || '时间未知';
                 const typeLabel = getMessageTypeLabel(message.msg_type);
                 
                 messageItem.innerHTML = `
@@ -587,7 +750,7 @@
                         </div>
                         <span class="text-sm text-base-content/60">${formattedTime}</span>
                     </div>
-                    <div class="mt-2 line-clamp-2 text-sm">
+                    <div class="mt-2 text-sm whitespace-pre-wrap">
                         ${getMessagePreview(message)}
                     </div>
                     <div class="mt-2 flex justify-between items-center">
@@ -604,27 +767,27 @@
             });
         }
 
-        // 获取消息预览
+        // 获取消息完整内容
         function getMessagePreview(message) {
             switch (message.msg_type) {
                 case 'text':
-                    return message.content || '空消息';
+                    return escapeHtml(message.content || '空消息');
                 case 'image':
-                    return '[图片消息]';
+                    return `[图片消息] 媒体ID: ${escapeHtml(message.media_id || '未知')}`;
                 case 'voice':
-                    return '[语音消息]';
+                    return `[语音消息] 媒体ID: ${escapeHtml(message.media_id || '未知')} 时长: ${message.voice_duration || 0}秒`;
                 case 'video':
-                    return '[视频消息]';
+                    return `[视频消息] 媒体ID: ${escapeHtml(message.media_id || '未知')} 标题: ${escapeHtml(message.title || '')}`;
                 case 'file':
-                    return `[文件] ${message.file_name || '未命名文件'}`;
+                    return `[文件] ${escapeHtml(message.file_name || '未命名文件')} (${formatFileSize(message.file_size || 0)})`;
                 case 'location':
-                    return '[位置消息]';
+                    return `[位置消息] ${escapeHtml(message.location_label || '')} ${escapeHtml(message.location_desc || '')}`;
                 case 'link':
-                    return `[链接] ${message.title || '链接消息'}`;
+                    return `[链接] ${escapeHtml(message.title || '链接消息')}\n${escapeHtml(message.description || '')}\n${escapeHtml(message.url || '')}`;
                 case 'event':
-                    return `[事件] ${message.event_type || '未知事件'}`;
+                    return `[事件] ${escapeHtml(message.event_type || '未知事件')} 键值: ${escapeHtml(message.event_key || '')}`;
                 default:
-                    return `[${message.msg_type || '未知类型'}]`;
+                    return `[${message.msg_type || '未知类型'}] ${escapeHtml(message.content || '')}`;
             }
         }
 
@@ -718,7 +881,8 @@
             detailIdEl.textContent = message.message_id;
             detailFromEl.textContent = message.from_user || '未知用户';
             detailTypeEl.textContent = getMessageTypeLabel(message.msg_type);
-            detailTimeEl.textContent = formatDateTime(message.create_time);
+            // 直接使用created_date字段，显示原始时间格式
+            detailTimeEl.textContent = message.created_date || '时间未知';
             detailStatusEl.textContent = message.is_read ? '已读' : '未读';
             
             // 更新标记已读按钮状态
@@ -895,7 +1059,7 @@
                     msg.from_user || '未知',
                     getMessageTypeLabel(msg.msg_type),
                     msg.content || msg.file_name || '',
-                    formatDateTime(msg.create_time),
+                    formatDateTime(msg.created_time || msg.createTime || msg.create_time),
                     msg.is_read ? '已读' : '未读'
                 ]);
                 
@@ -938,8 +1102,24 @@
         }
 
         // 工具函数：格式化日期时间
-        function formatDateTime(dateString) {
-            const date = new Date(dateString);
+        function formatDateTime(dateValue) {
+            // 处理不同类型的时间输入：UNIX时间戳、字符串、Date对象
+            let date;
+            
+            // 如果是数字，假定是UNIX时间戳（秒）
+            if (typeof dateValue === 'number') {
+                date = new Date(dateValue * 1000); // 转换为毫秒
+            } 
+            // 如果是字符串且看起来像时间戳
+            else if (typeof dateValue === 'string' && /^\d{10,13}$/.test(dateValue)) {
+                date = new Date(parseInt(dateValue) * (dateValue.length === 10 ? 1000 : 1));
+            }
+            // 其他情况直接转换
+            else {
+                date = new Date(dateValue);
+            }
+            
+            // 验证日期是否有效
             if (isNaN(date.getTime())) return '无效时间';
             
             const now = new Date();
