@@ -526,34 +526,42 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
         }
 
         // 解析XML消息
-        const message = callbackCrypto.parseXMLMessage(decryptResult.data);
+        const message = await callbackCrypto.parseXMLMessage(decryptResult.data);
 
         // 记录消息日志
-        console.log(`[回调消息] Code: ${code}, 发送者: ${message.fromUserName}, 类型: ${message.msgType}`);
+        console.log(`[回调消息] Code: ${code}, 发送者: ${message.fromUserName || 'undefined'}, 类型: ${message.msgType || 'undefined'}`);
         if (message.msgType === 'text') {
             console.log(`[回调消息] 内容: ${message.content}`);
         }
 
-        // 构建完整的消息对象，添加元数据
-    const fullMessage = {
-        message_id: message.msgId || uuidv4(), // 优先使用企业微信消息ID，没有则生成UUID
-        config_code: code,
-        from_user: message.fromUserName,
-        from_user_name: message.fromUserName, // 初始设置为FromUserName，后续尝试获取名称
-        to_user: message.toUserName,
-        agent_id: message.agentId || config.agentid,
-        msg_type: message.msgType,
-        content: message.content || null,
-        media_id: message.mediaId || null,
-        pic_url: message.picUrl || null,
-        file_name: message.fileName || null,
-        file_size: message.fileSize || null,
-        event_type: message.Event || message.event || null,
-        event_key: message.EventKey || message.eventKey || null,
-        quoteMsg: message.quoteMsg || null,  // 直接传递对象
-        createTime: message.createTime || Math.floor(Date.now() / 1000),  // 使用时间戳
-        is_read: 0
-    };
+        // 构建完整的消息对象，添加元数据 - 确保所有NOT NULL字段都有默认值
+        const fullMessage = {
+            message_id: message.msgId || uuidv4(), // 优先使用企业微信消息ID，没有则生成UUID
+            config_code: code || '',
+            from_user: message.fromUserName || 'system', // 确保from_user不为null
+            from_user_name: message.fromUserName || '系统',
+            to_user: message.toUserName || '',
+            agent_id: message.agentId || config.agentid,
+            msg_type: message.msgType || 'text', // 确保msg_type不为null，默认为'text'
+            content: message.content || null,
+            media_id: message.mediaId || null,
+            pic_url: message.picUrl || null,
+            file_name: message.fileName || null,
+            file_size: message.fileSize || null,
+            event_type: message.eventType || null,
+            event_key: message.eventKey || null,
+            quote_msg_id: message.quoteMsg?.msgId || null,
+            quote_content: message.quoteMsg?.content || null,
+            quote_from_user: message.quoteMsg?.fromUser || null,
+            quote_from_user_name: message.quoteMsg?.fromUserName || null,
+            quote_msg_type: message.quoteMsg?.msgType || null,
+            createTime: message.createTime || Math.floor(Date.now() / 1000),
+            is_read: 0,
+            // 添加时间相关字段确保完整
+            created_at: Math.floor(Date.now() / 1000),
+            created_time: new Date().toISOString().split('.')[0] + 'Z',
+            created_date: new Date().toISOString().replace('Z', '').replace('T', ' ')
+        };
 
         // 尝试获取用户名称
         try {
