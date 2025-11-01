@@ -147,8 +147,27 @@ class WeChatService {
             throw new Error(`获取成员列表失败: ${data.errmsg} (${data.errcode})`);
         }
 
-        return data.userlist || [];
-    }
-}
-
-module.exports = WeChatService;
+	        return data.userlist || [];
+	    }
+	
+	    // 获取用户详细信息
+	    async getUserDetail(corpid, corpsecret, userid) {
+	        const accessToken = await this.getToken(corpid, corpsecret);
+	        const response = await axios.get(`${this.apiBase}/cgi-bin/user/get`, {
+	            params: { access_token: accessToken, userid: userid }
+	        });
+	
+	        const { data } = response;
+	        if (data.errcode !== 0) {
+	            // 忽略用户不存在的错误，返回null
+	            if (data.errcode === 60111) {
+	                return null;
+	            }
+	            throw new Error(`获取用户详情失败: ${data.errmsg} (${data.errcode})`);
+	        }
+	
+	        return data;
+	    }
+	}
+	
+	module.exports = WeChatService;
