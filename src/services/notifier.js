@@ -560,8 +560,41 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
             // 添加时间相关字段确保完整
             created_at: Math.floor(Date.now() / 1000),
             created_time: new Date().toISOString().split('.')[0] + 'Z',
-            created_date: new Date().toISOString().replace('Z', '').replace('T', ' ')
+            created_date: new Date().toISOString().replace('Z', '').replace('T', ' '),
+            
+            // 新增支持的消息类型字段
+            format: message.format || null, // 语音消息格式
+            recognition: message.recognition || null, // 语音识别结果
+            thumb_media_id: message.thumbMediaId || null, // 视频消息缩略图
+            location_x: message.location_X || null, // 位置消息经度
+            location_y: message.location_Y || null, // 位置消息纬度
+            scale: message.scale || null, // 位置消息缩放比例
+            label: message.label || null, // 位置消息标签
+            title: message.title || null, // 链接消息标题
+            description: message.description || null, // 链接消息描述
+            url: message.url || null, // 链接消息URL
+            app_type: message.appType || null // 应用类型标识
         };
+        
+        // 根据消息类型进行特定处理和日志记录
+        if (message.msgType === 'text') {
+            console.log(`[回调消息] 文本内容: ${message.content}`);
+        } else if (message.msgType === 'image') {
+            console.log(`[回调消息] 图片URL: ${message.picUrl}, 媒体ID: ${message.mediaId}`);
+        } else if (message.msgType === 'voice') {
+            console.log(`[回调消息] 语音格式: ${message.format}, 媒体ID: ${message.mediaId}`);
+            if (message.recognition) {
+                console.log(`[回调消息] 语音识别结果: ${message.recognition}`);
+            }
+        } else if (message.msgType === 'video') {
+            console.log(`[回调消息] 视频媒体ID: ${message.mediaId}, 缩略图ID: ${message.thumbMediaId}`);
+        } else if (message.msgType === 'location') {
+            console.log(`[回调消息] 位置: ${message.label}, 坐标: (${message.location_X}, ${message.location_Y})`);
+        } else if (message.msgType === 'link') {
+            console.log(`[回调消息] 链接标题: ${message.title}, URL: ${message.url}`);
+        } else if (message.msgType === 'file') {
+            console.log(`[回调消息] 文件名: ${message.fileName}, 大小: ${message.fileSize}`);
+        }
 
         // 尝试获取用户名称
         try {
