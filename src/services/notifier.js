@@ -254,28 +254,29 @@ async function sendEnhancedNotification(code, messageData) {
                          JSON.stringify(messageData.articles || [], null, 2).substring(0, 500),
                 media_id: messageData.media_id || null,
                 createTime: Math.floor(Date.now() / 1000),
-                is_read: 0
+                is_read: 0,
+                // 添加必要的时间相关字段以确保数据库存储完整性
+                created_at: Math.floor(Date.now() / 1000),
+                created_time: new Date().toISOString().split('.')[0] + 'Z',
+                created_date: new Date().toISOString().replace('Z', '').replace('T', ' ')
             };
             
-            try {
-                console.log('💾 // 4. 尝试获取用户名称并保存消息记录到数据库');
-            try {
-                // 尝试获取用户名称
-                const userDetail = await wechat.getUserDetail(config.corpid, corpsecret, decryptedMessage.fromUserName);
-                if (userDetail && userDetail.name) {
-                    messageRecord.from_user_name = userDetail.name;
+            // 异步保存消息记录，不阻塞主流程
+            (async () => {
+                try {
+                    console.log('💾 保存消息记录到数据库...');
+                    await db.saveReceivedMessage(messageRecord);
+                    console.log('✅ 消息记录保存成功:', messageRecord.message_id);
+                    
+                    // 异步更新消息统计
+                    updateMessageStats(code, messageData.type).catch(err => {
+                        console.error('❌ 更新消息统计失败:', err);
+                    });
+                } catch (dbError) {
+                    console.error('❌ 保存消息记录失败:', dbError);
+                    // 数据库保存失败不应影响API调用成功的返回
                 }
-            } catch (nameError) {
-                console.warn(`无法获取用户 ${decryptedMessage.fromUserName} 的名称:`, nameError.message);
-                // 忽略错误，使用默认的FromUserName作为名称
-            }
-
-            await db.saveReceivedMessage(messageRecord);
-                console.log('✅ 消息记录保存成功:', messageRecord.message_id);
-            } catch (dbError) {
-                console.error('❌ 保存消息记录失败:', dbError);
-                // 数据库保存失败不应影响API调用成功的返回
-            }
+            })();
         }
         
         return result;
@@ -871,6 +872,26 @@ async function getMessageStats(configCode, timeRange = {}) {
     }
 }
 
+/**
+ * 验证企业微信凭证并获取成员列表
+ * @param {string} corpid - 企业ID
+ * @param {string} corpsecret - 应用密钥
+ * @returns {Promise<Array>} 成员列表
+ */
+async function validateCredentials(corpid, corpsecret) {
+    try {
+        console.log('🔐 验证企业微信凭证...', { corpid });
+        const accessToken = await wechat.getToken(corpid, corpsecret);
+        console.log('✅ 获取访问令牌成功');
+        const users = await wechat.getAllUsers(accessToken);
+        console.log('✅ 获取成员列表成功，共', users.length, '个成员');
+        return users;
+    } catch (error) {
+        console.error('❌ 凭证验证失败:', error.message);
+        throw error;
+    }
+}
+
 module.exports = {
     // 配置管理
     createCallbackConfiguration,
@@ -894,5 +915,8 @@ module.exports = {
     // 消息管理和查询
     queryMessages,
     markMessageAsRead,
-    getMessageStats
+    getMessageStats,
+    
+    // 凭证验证
+    validateCredentials
 };

@@ -3,10 +3,8 @@ const express = require('express');
 const path = require('path');
 const multer = require('multer');
 const notifier = require('../services/notifier');
-const WeChatService = require('../core/wechat');
 
 const router = express.Router();
-const wechat = new WeChatService();
 
 // 中间件：验证配置权限
 async function validateConfigAccess(req, res, next) {
@@ -53,8 +51,8 @@ router.post('/api/validate', async (req, res) => {
         return res.status(400).json({ error: '参数不完整' });
     }
     try {
-        const accessToken = await wechat.getToken(corpid, corpsecret);
-        const users = await wechat.getAllUsers(accessToken);
+        // 通过notifier服务验证凭证并获取成员列表
+        const users = await notifier.validateCredentials(corpid, corpsecret);
         res.json({ users });
     } catch (err) {
         res.status(400).json({ error: err.message || '凭证无效或API请求失败' });
@@ -310,8 +308,11 @@ router.post('/api/notify/:code/news', async (req, res) => {
     }
 });
 
+// 导入fs.promises
+const fs = require('fs').promises;
+
 // 13. POST /api/notify/:code/file - 上传并发送文件
-router.post('/api/notify/:code/file', upload.single('file'), async (req, res) => {
+router.post('/api/notify/:code/file', upload.single('file'), async (req, res, next) => {
     const { code } = req.params;
     const { fileType = 'file' } = req.body;
     
@@ -345,13 +346,6 @@ router.post('/api/notify/:code/file', upload.single('file'), async (req, res) =>
             errmsg: result.errmsg
         });
         
-        // 清理临时文件
-        const fs = require('fs');
-        fs.unlink(req.file.path, (err) => {
-            if (err) console.error('清理临时文件失败:', err);
-            else console.log('✅ 临时文件已清理');
-        });
-
         res.json({ 
             message: '文件发送成功', 
             response: result,
@@ -363,16 +357,18 @@ router.post('/api/notify/:code/file', upload.single('file'), async (req, res) =>
             error: err.message,
             code: code.substring(0, 8) + '...'
         });
-        
-        // 清理临时文件
-        const fs = require('fs');
-        fs.unlink(req.file.path, (cleanupErr) => {
-            if (cleanupErr) console.error('清理临时文件失败:', cleanupErr);
-            else console.log('✅ 临时文件已清理');
-        });
-
-        res.status(err.message?.includes('未找到配置') ? 404 : 500)
-           .json({ error: err.message || '文件发送失败' });
+        // 将错误传递给全局错误处理中间件
+        return next(err);
+    } finally {
+        // 确保清理临时文件，无论成功或失败
+        if (req.file && req.file.path) {
+            try {
+                await fs.unlink(req.file.path);
+                console.log('✅ 临时文件已清理');
+            } catch (cleanupErr) {
+                console.error('清理临时文件失败:', cleanupErr);
+            }
+        }
     }
 });
 
@@ -417,9 +413,27 @@ router.get('/api/messages/:code', validateConfigAccess, async (req, res) => {
             }
         });
         
-        // 执行消息查询
+        // 执行消息查询，统一参数命名
         console.log('🔄 执行消息查询...');
-        const result = await notifier.queryMessages(code, queryParams);
+        // 统一参数命名：规范化所有查询参数
+        const normalizedParams = {
+            // 页码参数规范化
+            page: parseInt(queryParams.page) || 1,
+            // 统一使用limit参数进行分页，优先使用pageSize作为备选
+            limit: parseInt(queryParams.limit) || parseInt(queryParams.pageSize) || 20,
+            // 排序参数规范化
+            sortBy: queryParams.sortBy || 'created_at',
+            sortOrder: queryParams.sortOrder || 'desc',
+            // 保留其他查询参数
+            startDate: queryParams.startDate,
+            endDate: queryParams.endDate,
+            msgType: queryParams.msgType,
+            keyword: queryParams.keyword,
+            fromUser: queryParams.fromUser,
+            toUser: queryParams.toUser,
+            isRead: queryParams.isRead === 'true' ? true : (queryParams.isRead === 'false' ? false : undefined)
+        };
+        const result = await notifier.queryMessages(code, normalizedParams);
         
         // 详细日志：查询结果
         console.log('✅ 消息查询完成:', {
@@ -576,5 +590,52 @@ router.get('/api/messages/types', (req, res) => {
         ]
     });
 });
+
+/**
+ * 全局错误处理中间件
+ * 统一处理所有未捕获的错误，提供标准化的错误响应格式
+ */
+function errorHandler(err, req, res, next) {
+    // 记录详细错误信息
+    console.error('💥 全局错误捕获:', {
+        error: err.message,
+        stack: err.stack,
+        path: req.path,
+        method: req.method,
+        timestamp: new Date().toISOString()
+    });
+    
+    // 确定HTTP状态码
+    let statusCode = 500; // 默认服务器错误
+    
+    // 根据错误类型设置不同的状态码
+    if (err.message && err.message.includes('未找到配置')) {
+        statusCode = 404; // 配置不存在
+    } else if (err.message && (err.message.includes('参数') || err.message.includes('无效'))) {
+        statusCode = 400; // 参数错误
+    } else if (err.name === 'UnauthorizedError') {
+        statusCode = 401; // 认证错误
+    } else if (err.name === 'ForbiddenError') {
+        statusCode = 403; // 权限错误
+    }
+    
+    // 构建标准化的错误响应
+    const errorResponse = {
+        success: false,
+        error: err.message || '服务器内部错误',
+        timestamp: Date.now()
+    };
+    
+    // 开发环境可以返回更多错误详情
+    if (process.env.NODE_ENV !== 'production') {
+        errorResponse.stack = err.stack;
+    }
+    
+    // 返回错误响应
+    res.status(statusCode).json(errorResponse);
+}
+
+// 应用全局错误处理中间件
+router.use(errorHandler);
 
 module.exports = router;
