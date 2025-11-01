@@ -463,7 +463,7 @@ class Database {
                     format, recognition, thumb_media_id, location_x, location_y, scale, label,
                     title, description, url, app_type
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             
             stmt.run(
@@ -505,6 +505,7 @@ class Database {
                 messageData.url || null,
                 messageData.app_type || null
             );
+            
             
             stmt.finalize(async (err) => {
                     if (err) {
