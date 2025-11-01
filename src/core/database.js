@@ -445,9 +445,12 @@ class Database {
                     msg_type, content, media_id, pic_url, file_name, file_size,
                     quote_msg_id, quote_content, quote_from_user, quote_from_user_name, quote_msg_type,
                     event_type, event_key,
-                    created_at, created_time, created_date, is_reply, is_read
+                    created_at, created_time, created_date, is_reply, is_read,
+                    -- 新增企业微信消息类型支持字段
+                    format, recognition, thumb_media_id, location_x, location_y, scale, label,
+                    title, description, url, app_type
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             `);
             
             stmt.run(
@@ -463,18 +466,31 @@ class Database {
                 messageData.pic_url || null,
                 messageData.file_name || null,
                 messageData.file_size || null,
-                messageData.quoteMsg?.msgId || null,
-                messageData.quoteMsg?.content || null,
-                messageData.quoteMsg?.fromUser || null,
-                messageData.quoteMsg?.fromUserName || null,
-                messageData.quoteMsg?.msgType || null,
+                // 引用消息相关字段，支持两种格式：quoteMsg对象或单独字段
+                messageData.quoteMsg?.msgId || messageData.quote_msg_id || null,
+                messageData.quoteMsg?.content || messageData.quote_content || null,
+                messageData.quoteMsg?.fromUser || messageData.quote_from_user || null,
+                messageData.quoteMsg?.fromUserName || messageData.quote_from_user_name || null,
+                messageData.quoteMsg?.msgType || messageData.quote_msg_type || null,
                 messageData.event_type || null,
                 messageData.event_key || null,
                 beijingTimestamp,
                 isoTimeStr,
                 dateStr,
                 isReply,
-                0
+                0,
+                // 新增企业微信消息类型支持字段
+                messageData.format || null,
+                messageData.recognition || null,
+                messageData.thumb_media_id || null,
+                messageData.location_x || messageData.location_X || null,
+                messageData.location_y || messageData.location_Y || null,
+                messageData.scale || null,
+                messageData.label || null,
+                messageData.title || null,
+                messageData.description || null,
+                messageData.url || null,
+                messageData.app_type || null
             );
             
             stmt.finalize(async (err) => {
