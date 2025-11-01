@@ -258,8 +258,19 @@ async function sendEnhancedNotification(code, messageData) {
             };
             
             try {
-                console.log('💾 保存消息记录到数据库...');
-                await db.saveReceivedMessage(messageRecord);
+                console.log('💾 // 4. 尝试获取用户名称并保存消息记录到数据库
+            try {
+                // 尝试获取用户名称
+                const userDetail = await wechat.getUserDetail(config.corpid, corpsecret, decryptedMessage.fromUserName);
+                if (userDetail && userDetail.name) {
+                    messageRecord.from_user_name = userDetail.name;
+                }
+            } catch (nameError) {
+                console.warn(`无法获取用户 ${decryptedMessage.fromUserName} 的名称:`, nameError.message);
+                // 忽略错误，使用默认的FromUserName作为名称
+            }
+
+            await db.saveReceivedMessage(messageRecord);rd);
                 console.log('✅ 消息记录保存成功:', messageRecord.message_id);
             } catch (dbError) {
                 console.error('❌ 保存消息记录失败:', dbError);
@@ -528,7 +539,7 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
         message_id: message.msgId || uuidv4(), // 优先使用企业微信消息ID，没有则生成UUID
         config_code: code,
         from_user: message.fromUserName,
-        from_user_name: message.fromUserName,
+        from_user_name: message.fromUserName, // 初始设置为FromUserName，后续尝试获取名称
         to_user: message.toUserName,
         agent_id: message.agentId || config.agentid,
         msg_type: message.msgType,
@@ -543,6 +554,18 @@ async function handleCallbackMessage(code, encryptedData, msgSignature, timestam
         createTime: message.createTime || Math.floor(Date.now() / 1000),  // 使用时间戳
         is_read: 0
     };
+
+        // 尝试获取用户名称
+        try {
+            const corpsecret = crypto.decrypt(config.encrypted_corpsecret);
+            const userDetail = await wechat.getUserDetail(config.corpid, corpsecret, fullMessage.from_user);
+            if (userDetail && userDetail.name) {
+                fullMessage.from_user_name = userDetail.name;
+            }
+        } catch (nameError) {
+            console.warn(`无法获取用户 ${fullMessage.from_user} 的名称:`, nameError.message);
+            // 忽略错误，使用默认的FromUserName作为名称
+        }
 
         // 存储消息到数据库
         try {
