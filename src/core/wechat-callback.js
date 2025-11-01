@@ -64,7 +64,7 @@ class WeChatCallbackCrypto {
 
 
     /**
-     * 解析XML消息 - 增强版，支持引用消息
+     * 解析XML消息 - 增强版，支持企业微信文档中的所有消息类型
      * @param {string} xmlString - XML字符串
      * @returns {Object} 解析后的消息对象
      */
@@ -74,47 +74,75 @@ class WeChatCallbackCrypto {
             let parsed = x2o(xmlString);
             const xml = parsed.xml || parsed;
 
-            // 基础消息对象
+            // 基础消息对象 - 包含企业微信文档中所有消息类型的字段
             const message = {
+                // 通用字段
                 fromUserName: xml.FromUserName || '',
                 toUserName: xml.ToUserName || '',
                 msgType: xml.MsgType || '',
-                content: xml.Content || '',
-                picUrl: xml.PicUrl || '',
+                createTime: xml.CreateTime || '',
                 msgId: xml.MsgId || '',
                 agentId: xml.AgentID || '',
-                createTime: xml.CreateTime || '',
+                
+                // 文本消息字段
+                content: xml.Content || '',
+                
+                // 图片消息字段
+                picUrl: xml.PicUrl || '',
                 mediaId: xml.MediaId || '',
+                
+                // 语音消息字段
+                format: xml.Format || '',
+                recognition: xml.Recognition || '', // 语音识别结果
+                
+                // 视频消息字段
+                thumbMediaId: xml.ThumbMediaId || '',
+                
+                // 位置消息字段
+                location_X: xml.Location_X || '',
+                location_Y: xml.Location_Y || '',
+                scale: xml.Scale || '',
+                label: xml.Label || '',
+                
+                // 链接消息字段
+                title: xml.Title || '',
+                description: xml.Description || '',
+                url: xml.Url || '',
+                
+                // 文件消息字段
+                fileName: xml.FileName || '',
+                fileSize: xml.FileSize || '',
+                
+                // 事件相关字段
                 eventType: xml.Event || '',
                 eventKey: xml.EventKey || '',
-                fileName: xml.FileName || '',
-                fileSize: xml.FileSize || ''
+                
+                // 应用类型标识
+                appType: xml.AppType || ''
             };
 
-            // 如果检测到可能包含Quote元素，使用xml2js进行更详细的解析
-            if (xmlString.includes('Quote')) {
-                try {
-                    const parser = new xml2js.Parser({
-                        explicitArray: false,
-                        ignoreAttrs: true,
-                        trim: true
-                    });
-                    const detailedParsed = await parser.parseStringPromise(xmlString);
-                    const detailedXml = detailedParsed.xml || {};
+            // 使用xml2js进行更详细的解析，确保捕获所有可能的嵌套结构
+            try {
+                const parser = new xml2js.Parser({
+                    explicitArray: false,
+                    ignoreAttrs: true,
+                    trim: true
+                });
+                const detailedParsed = await parser.parseStringPromise(xmlString);
+                const detailedXml = detailedParsed.xml || {};
 
-                    // 处理Quote引用消息
-                    if (detailedXml.Quote) {
-                        message.quoteMsg = {
-                            msgId: detailedXml.Quote.MsgId || '',
-                            content: detailedXml.Quote.Content || '',
-                            fromUser: detailedXml.Quote.FromUserName || '',
-                            fromUserName: detailedXml.Quote.FromUserName || '',
-                            msgType: detailedXml.Quote.MsgType || ''
-                        };
-                    }
-                } catch (xml2jsError) {
-                    console.warn('详细XML解析失败（可能是简单消息）:', xml2jsError.message);
+                // 处理Quote引用消息
+                if (detailedXml.Quote) {
+                    message.quoteMsg = {
+                        msgId: detailedXml.Quote.MsgId || '',
+                        content: detailedXml.Quote.Content || '',
+                        fromUser: detailedXml.Quote.FromUserName || '',
+                        fromUserName: detailedXml.Quote.FromUserName || '',
+                        msgType: detailedXml.Quote.MsgType || ''
+                    };
                 }
+            } catch (xml2jsError) {
+                console.warn('详细XML解析失败:', xml2jsError.message);
             }
 
             // 转换数字类型字段
@@ -123,6 +151,15 @@ class WeChatCallbackCrypto {
             }
             if (message.fileSize) {
                 message.fileSize = parseInt(message.fileSize);
+            }
+            if (message.scale) {
+                message.scale = parseInt(message.scale);
+            }
+            if (message.location_X) {
+                message.location_X = parseFloat(message.location_X);
+            }
+            if (message.location_Y) {
+                message.location_Y = parseFloat(message.location_Y);
             }
 
             return message;
