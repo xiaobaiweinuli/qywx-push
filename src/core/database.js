@@ -1051,6 +1051,20 @@ class Database {
             });
         });
     }
+
+    // 更新消息统计信息
+    // 注意：由于系统使用实时统计查询，此方法主要用于日志记录和未来扩展
+    async updateMessageStats(configCode, msgType) {
+        try {
+            console.log(`[统计] 记录消息类型: ${msgType} 到配置: ${configCode.substring(0, 8)}...`);
+            // 这里可以添加自定义的统计逻辑，例如更新缓存或专门的统计表
+            // 当前实现仅记录日志，表示统计操作已执行
+            return { success: true };
+        } catch (error) {
+            console.error('更新消息统计时出错:', error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = Database;
