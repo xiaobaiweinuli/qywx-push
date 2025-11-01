@@ -13,7 +13,7 @@ const db = new Database(DB_PATH);
 const crypto = new CryptoService(ENCRYPTION_KEY);
 const wechat = new WeChatService();
 
-db。init().catch(console.error);
+db.init().catch(console.error);
 
 /**
  * 创建回调配置（第一步）
@@ -258,7 +258,7 @@ async function sendEnhancedNotification(code, messageData) {
             };
             
             try {
-                console.log('💾 // 4. 尝试获取用户名称并保存消息记录到数据库'
+                console.log('💾 // 4. 尝试获取用户名称并保存消息记录到数据库');
             try {
                 // 尝试获取用户名称
                 const userDetail = await wechat.getUserDetail(config.corpid, corpsecret, decryptedMessage.fromUserName);
@@ -270,7 +270,7 @@ async function sendEnhancedNotification(code, messageData) {
                 // 忽略错误，使用默认的FromUserName作为名称
             }
 
-            await db.saveReceivedMessage(messageRecord);rd);
+            await db.saveReceivedMessage(messageRecord);
                 console.log('✅ 消息记录保存成功:', messageRecord.message_id);
             } catch (dbError) {
                 console.error('❌ 保存消息记录失败:', dbError);
