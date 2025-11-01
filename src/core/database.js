@@ -111,6 +111,19 @@ class Database {
                         -- 配置关联
                         config_code TEXT NOT NULL,       -- 关联的配置代码
                         
+                        -- 企业微信消息类型支持字段
+                        format TEXT,                     -- 语音消息格式
+                        recognition TEXT,                -- 语音转文本结果
+                        thumb_media_id TEXT,             -- 缩略图媒体ID
+                        location_x REAL,                 -- 位置消息X坐标
+                        location_y REAL,                 -- 位置消息Y坐标
+                        scale REAL,                      -- 位置消息缩放比例
+                        label TEXT,                      -- 位置消息标签
+                        title TEXT,                      -- 链接/应用消息标题
+                        description TEXT,                -- 链接/应用消息描述
+                        url TEXT,                        -- 链接消息URL
+                        app_type TEXT,                   -- 应用类型
+                        
                         -- 外键约束
                         FOREIGN KEY (quote_msg_id) REFERENCES received_messages(message_id)
                     )
@@ -456,11 +469,11 @@ class Database {
             stmt.run(
                 messageData.message_id || `msg_${Date.now()}`,
                 messageData.config_code || '',
-                messageData.from_user,
-                messageData.from_user_name || messageData.from_user,
-                messageData.to_user,
-                messageData.agent_id,
-                messageData.msg_type,
+                messageData.from_user || 'unknown_user',
+                messageData.from_user_name || messageData.from_user || 'unknown',
+                messageData.to_user || '',
+                messageData.agent_id || '',
+                messageData.msg_type || 'text',
                 messageData.content || null,
                 messageData.media_id || null,
                 messageData.pic_url || null,
