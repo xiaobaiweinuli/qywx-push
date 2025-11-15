@@ -1,0 +1,26 @@
+[build]
+  # 基本目录 - 使用根目录
+  base = ""
+  # 构建命令 - 使用我们已有的build脚本
+  command = "npm run build"
+  # 发布目录 - 设置为public目录，因为这里包含前端页面
+  publish = "public"
+
+[dev]
+  # 开发服务器设置
+  command = "npm run dev"
+  port = 12121
+
+[[redirects]]
+  # 重定向所有API请求到Netlify函数
+  from = "/api/*"
+  to = "/.netlify/functions/server"
+  status = 200
+
+[[headers]]
+  # 设置CORS头
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
+    Access-Control-Allow-Methods = "GET, POST, PUT, DELETE, OPTIONS"
+    Access-Control-Allow-Headers = "Content-Type, Authorization"

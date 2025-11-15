@@ -26,7 +26,38 @@ app.use('/api/callback', express.raw({
     type: ['text/xml', 'application/xml', 'text/plain'],
     limit: '10mb'
 }));
-app.use(express.json({ limit: '10mb' }));
+
+// 自定义JSON解析中间件，预处理包含实际换行符的JSON
+app.use((req, res, next) => {
+    if (req.headers['content-type']?.includes('application/json')) {
+        let data = '';
+        req.on('data', chunk => {
+            data += chunk;
+        });
+        req.on('end', () => {
+            try {
+                // 预处理JSON字符串，处理实际换行符
+                // 1. 找到所有内容字段中包含的实际换行符并转义
+                const processedData = data.replace(/"content":"([^"]*)"/gs, (match, content) => {
+                    // 只转义content字段中的换行符，保留其他格式
+                    const escapedContent = content.replace(/\n/g, '\\n');
+                    return `"content":"${escapedContent}"`;
+                });
+                
+                req.body = JSON.parse(processedData);
+                next();
+            } catch (error) {
+                // 如果预处理后仍然解析失败，直接将错误传递给错误处理中间件
+                next(error);
+            }
+        });
+    } else {
+        // 对于非JSON请求，使用默认的解析
+        next();
+    }
+});
+
+// 自定义JSON解析中间件已处理所有JSON请求，不再需要额外的express.json()
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 
@@ -92,4 +123,4 @@ const server = app.listen(PORT, '0.0.0.0', () => {
 });
 
 // 导出server实例（用于测试）
-module.exports = server; 
+module.exports = server;

@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
+    "build": "npm install && mkdir -p netlify/functions && cp server.js netlify/functions/ && echo '构建完成 - 已为Netlify部署准备文件'",
+    "netlify:dev": "netlify dev",
     "docker:build": "docker build -t wechat-notifier .",
     "docker:build:clawcloud": "docker build -f Dockerfile.clawcloud -t wechat-notifier:clawcloud .",
     "docker:up": "docker-compose up -d",
@@ -38,7 +40,8 @@
     "sqlite3": "^5.1.6",
     "uuid": "^9.0.0",
     "wxcrypt": "^1.4.3",
-    "xml2js": "^0.6.2"
+    "xml2js": "^0.6.2",
+    "serverless-http": "^3.2.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.1"
