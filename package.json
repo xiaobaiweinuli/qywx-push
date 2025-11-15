@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "build": "npm install && mkdir -p netlify/functions && cp server.js netlify/functions/ && echo '构建完成 - 已为Netlify部署准备文件'",
+    "build": "npm install && echo '构建完成 - 依赖已安装'",
     "netlify:dev": "netlify dev",
     "docker:build": "docker build -t wechat-notifier .",
     "docker:build:clawcloud": "docker build -f Dockerfile.clawcloud -t wechat-notifier:clawcloud .",
