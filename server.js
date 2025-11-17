@@ -43,7 +43,7 @@ app.use((req, res, next) => {
                     const escapedContent = content.replace(/\n/g, '\\n');
                     return `"content":"${escapedContent}"`;
                 });
-                
+
                 req.body = JSON.parse(processedData);
                 next();
             } catch (error) {
@@ -59,7 +59,9 @@ app.use((req, res, next) => {
 
 // 自定义JSON解析中间件已处理所有JSON请求，不再需要额外的express.json()
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use('/public', express.static(path.join(__dirname, 'public')));
+
+// 静态文件服务 - 移除 /public 前缀，使路径与 Netlify 保持一致
+app.use(express.static(path.join(__dirname, 'public')));
 
 // 请求日志中间件
 app.use((req, res, next) => {
@@ -111,8 +113,8 @@ const server = app.listen(PORT, '0.0.0.0', () => {
     console.log('\n🎉 企业微信通知服务启动成功！');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log(`🚀 服务地址: http://localhost:${PORT}`);
-    console.log(`📱 测试页面: http://localhost:${PORT}/public/message-sender.html`);
-    console.log(`📖 API文档: http://localhost:${PORT}/public/enhanced-api-docs.html`);
+    console.log(`📱 测试页面: http://localhost:${PORT}/message-sender.html`);
+    console.log(`📖 API文档: http://localhost:${PORT}/enhanced-api-docs.html`);
     console.log(`🔧 配置页面: http://localhost:${PORT}`);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('💡 提示: 按 Ctrl+C 停止服务');
