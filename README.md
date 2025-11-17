@@ -108,7 +108,7 @@ MIT许可证允许您自由地使用、修改和分发本软件，无论是商�
 
 ## 行为准则
 
-[本项目遵循如下的行为规范](./docs/行为准则.md) 
+[本项目遵循如下的行为规范](./docs/CODE_OF_CONDUCT.md) 
 
 ## 🙏 致谢 | Acknowledgments
 
