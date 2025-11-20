@@ -6,6 +6,30 @@
 export class DatabaseCF {
     constructor(db) {
         this.db = db;
+        this.initialized = false;
+    }
+
+    // 确保数据库已初始化
+    async ensureInitialized() {
+        if (this.initialized) return;
+        
+        try {
+            // 检查表是否存在
+            const tables = await this.db.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='configurations'"
+            ).first();
+            
+            if (!tables) {
+                console.log('📊 初始化数据库表...');
+                await this.init();
+            }
+            this.initialized = true;
+        } catch (error) {
+            console.error('检查数据库失败:', error);
+            // 尝试初始化
+            await this.init();
+            this.initialized = true;
+        }
     }
 
     // 初始化数据库表结构
@@ -94,8 +118,13 @@ export class DatabaseCF {
 
     // 保存配置
     async saveConfiguration(config) {
+        await this.ensureInitialized();
+        
         const { code, corpid, encrypted_corpsecret, agentid, touser, description,
             callback_token, encrypted_encoding_aes_key, callback_enabled } = config;
+
+        // 将 touser 转换为字符串（如果是数组）
+        const touserStr = Array.isArray(touser) ? touser.join(',') : touser;
 
         const result = await this.db.prepare(`
             INSERT OR REPLACE INTO configurations (
@@ -103,8 +132,15 @@ export class DatabaseCF {
                 callback_token, encrypted_encoding_aes_key, callback_enabled
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `).bind(
-            code, corpid, encrypted_corpsecret, agentid, touser, description,
-            callback_token, encrypted_encoding_aes_key, callback_enabled || 0
+            code, 
+            corpid, 
+            encrypted_corpsecret || '', 
+            agentid, 
+            touserStr, 
+            description || '',
+            callback_token || null, 
+            encrypted_encoding_aes_key || null, 
+            callback_enabled || 0
         ).run();
 
         return { id: result.meta.last_row_id, code };
@@ -116,6 +152,11 @@ export class DatabaseCF {
             'SELECT * FROM configurations WHERE code = ?'
         ).bind(code).first();
 
+        // 将 touser 字符串转换回数组
+        if (result && result.touser) {
+            result.touser = result.touser.split(',');
+        }
+
         return result;
     }
 
@@ -124,14 +165,23 @@ export class DatabaseCF {
         const { code, corpid, encrypted_corpsecret, agentid, touser, description,
             callback_token, encrypted_encoding_aes_key, callback_enabled } = config;
 
+        // 将 touser 转换为字符串（如果是数组）
+        const touserStr = Array.isArray(touser) ? touser.join(',') : touser;
+
         await this.db.prepare(`
             UPDATE configurations 
             SET corpid = ?, encrypted_corpsecret = ?, agentid = ?, touser = ?, description = ?,
                 callback_token = ?, encrypted_encoding_aes_key = ?, callback_enabled = ?
             WHERE code = ?
         `).bind(
-            corpid, encrypted_corpsecret, agentid, touser, description,
-            callback_token, encrypted_encoding_aes_key, callback_enabled,
+            corpid, 
+            encrypted_corpsecret, 
+            agentid, 
+            touserStr, 
+            description,
+            callback_token, 
+            encrypted_encoding_aes_key, 
+            callback_enabled,
             code
         ).run();
 
