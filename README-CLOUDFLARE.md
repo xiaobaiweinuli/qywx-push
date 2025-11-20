@@ -253,15 +253,27 @@ wrangler d1 execute wechat-notifier-db --file backup.sql
 
 ### 常见问题
 
-1. **数据库连接失败**
+1. **生成回调URL失败: Unexpected end of JSON input**
+   - **原因**：数据库表结构不兼容
+   - **快速修复**：
+     ```bash
+     # Windows
+     fix-cloudflare-db.bat
+     
+     # Mac/Linux
+     ./fix-cloudflare-db.sh
+     ```
+   - **详细说明**：查看 [QUICK-FIX-CN.md](./QUICK-FIX-CN.md)
+
+2. **数据库连接失败**
    - 检查 `wrangler.toml` 中的 `database_id`
    - 确认数据库已创建并初始化
 
-2. **环境变量未生效**
+3. **环境变量未生效**
    - 在 Cloudflare Dashboard 中配置环境变量
    - 重新部署项目
 
-3. **函数超时**
+4. **函数超时**
    - 优化数据库查询
    - 减少外部 API 调用
    - 使用 KV 缓存

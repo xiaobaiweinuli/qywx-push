@@ -67,7 +67,86 @@ export async function validateCredentials(corpid, corpsecret) {
     return usersData.userlist || [];
 }
 
-// 创建配置
+// 创建回调配置（第一步）
+export async function createCallbackConfiguration(db, encryptionKey, config) {
+    const dbInstance = new DatabaseCF(db);
+    const { corpid, callback_token, encoding_aes_key } = config;
+    
+    if (!corpid || !callback_token || !encoding_aes_key) {
+        throw new Error('回调配置参数不完整');
+    }
+    
+    // 生成唯一 code
+    const code = generateCode();
+    
+    // 加密敏感信息
+    const encrypted_encoding_aes_key = await encrypt(encoding_aes_key, encryptionKey);
+    
+    // 保存初始配置（只包含回调相关信息）
+    await dbInstance.saveConfiguration({
+        code,
+        corpid,
+        encrypted_corpsecret: null, // 第二步才提供
+        agentid: null, // 第二步才提供
+        touser: [], // 第二步才提供
+        description: '',
+        callback_token,
+        encrypted_encoding_aes_key,
+        callback_enabled: 1
+    });
+    
+    const callbackUrl = `/api/callback/${code}`;
+    
+    return {
+        code,
+        callbackUrl,
+        message: '回调URL生成成功'
+    };
+}
+
+// 完善配置（第二步）
+export async function completeConfiguration(db, encryptionKey, config) {
+    const dbInstance = new DatabaseCF(db);
+    const { code, corpsecret, agentid, touser, description } = config;
+    
+    if (!code || !corpsecret || !agentid || !touser) {
+        throw new Error('配置参数不完整');
+    }
+    
+    // 获取现有配置
+    const existingConfig = await dbInstance.getConfigurationByCode(code);
+    if (!existingConfig) {
+        throw new Error('配置不存在，请先完成第一步');
+    }
+    
+    // 加密敏感信息
+    const encrypted_corpsecret = await encrypt(corpsecret, encryptionKey);
+    
+    // 更新配置
+    await dbInstance.updateConfiguration({
+        code,
+        corpid: existingConfig.corpid,
+        encrypted_corpsecret,
+        agentid,
+        touser,
+        description: description || '',
+        callback_token: existingConfig.callback_token,
+        encrypted_encoding_aes_key: existingConfig.encrypted_encoding_aes_key,
+        callback_enabled: existingConfig.callback_enabled
+    });
+    
+    const apiUrl = `/api/notify/${code}`;
+    const callbackUrl = `/api/callback/${code}`;
+    
+    return {
+        code,
+        apiUrl,
+        callbackUrl,
+        message: '配置完成'
+    };
+}
+
+// 创建配置（一步完成，保持兼容性）
 export async function createConfiguration(db, encryptionKey, config) {
     const dbInstance = new DatabaseCF(db);
     const { corpid, corpsecret, agentid, touser, description } = config;

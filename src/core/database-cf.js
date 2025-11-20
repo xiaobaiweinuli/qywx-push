@@ -41,15 +41,14 @@ export class DatabaseCF {
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     code TEXT UNIQUE NOT NULL,
                     corpid TEXT NOT NULL,
-                    encrypted_corpsecret TEXT NOT NULL,
-                    agentid INTEGER NOT NULL,
-                    touser TEXT NOT NULL,
+                    encrypted_corpsecret TEXT,
+                    agentid INTEGER,
+                    touser TEXT,
                     description TEXT,
                     callback_token TEXT,
                     encrypted_encoding_aes_key TEXT,
                     callback_enabled BOOLEAN DEFAULT 0,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                    UNIQUE(corpid, agentid, touser)
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             `).run();
 
@@ -124,7 +123,7 @@ export class DatabaseCF {
             callback_token, encrypted_encoding_aes_key, callback_enabled } = config;
 
         // 将 touser 转换为字符串（如果是数组）
-        const touserStr = Array.isArray(touser) ? touser.join(',') : touser;
+        const touserStr = Array.isArray(touser) ? touser.join(',') : (touser || '');
 
         const result = await this.db.prepare(`
             INSERT OR REPLACE INTO configurations (
@@ -134,8 +133,8 @@ export class DatabaseCF {
         `).bind(
             code, 
             corpid, 
-            encrypted_corpsecret || '', 
-            agentid, 
+            encrypted_corpsecret || null, 
+            agentid || null, 
             touserStr, 
             description || '',
             callback_token || null, 

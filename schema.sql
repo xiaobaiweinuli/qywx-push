@@ -2,19 +2,19 @@
 -- 用于创建企业微信通知服务所需的表结构
 
 -- 配置表
+-- 注意：encrypted_corpsecret、agentid、touser 允许为空，以支持两步配置流程
 CREATE TABLE IF NOT EXISTS configurations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT UNIQUE NOT NULL,
     corpid TEXT NOT NULL,
-    encrypted_corpsecret TEXT NOT NULL,
-    agentid INTEGER NOT NULL,
-    touser TEXT NOT NULL,
+    encrypted_corpsecret TEXT,
+    agentid INTEGER,
+    touser TEXT,
     description TEXT,
     callback_token TEXT,
     encrypted_encoding_aes_key TEXT,
     callback_enabled BOOLEAN DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(corpid, agentid, touser)
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 接收消息表

@@ -50,8 +50,29 @@ document.addEventListener('DOMContentLoaded', function () {
                     encoding_aes_key: encodingAesKey
                 })
             });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || '生成失败');
+            
+            // 检查响应状态
+            if (!res.ok) {
+                // 尝试解析错误响应
+                let errorMessage = '生成失败';
+                try {
+                    const errorData = await res.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (jsonError) {
+                    // 如果无法解析 JSON，使用状态文本
+                    errorMessage = `服务器错误 (${res.status}): ${res.statusText}`;
+                }
+                throw new Error(errorMessage);
+            }
+            
+            // 解析成功响应
+            let data;
+            try {
+                data = await res.json();
+            } catch (jsonError) {
+                console.error('JSON 解析失败:', jsonError);
+                throw new Error('服务器返回了无效的响应格式');
+            }
 
             currentCode = data.code;
             showCallbackResult(data);
@@ -64,6 +85,7 @@ document.addEventListener('DOMContentLoaded', function () {
             configForm.corpid = { value: corpid };
 
         } catch (err) {
+            console.error('生成回调URL错误:', err);
             showError('生成回调URL失败: ' + err.message);
         } finally {
             submitBtn.disabled = false;
