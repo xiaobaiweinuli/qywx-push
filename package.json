@@ -21,7 +21,7 @@
     "kv:create": "wrangler kv namespace create CACHE",
     "kv:list": "wrangler kv namespace list",
     "logs": "wrangler pages deployment tail",
-    "build": "echo 'No build step required for Cloudflare Pages'"
+    "build": "echo 'Build completed - static files ready'"
   },
   "keywords": [
     "wechat",
