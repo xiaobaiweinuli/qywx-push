@@ -11,6 +11,9 @@ database_id = "ffa317f3-e3e9-4b32-9b49-cad556d78c5d"
 # 环境变量（敏感信息请在 Cloudflare Dashboard 中配置）
 [vars]
 NODE_ENV = "production"
+# 代理服务器配置（可选）
+# PROXY_URL = "http://your-proxy-server.com:3000/api/wechat"
+# PROXY_API_KEY = "your-api-key"  # 如果代理服务器启用了 API 密钥保护
 
 # KV 命名空间（可选，用于缓存 access_token）
 [[kv_namespaces]]

@@ -6,7 +6,7 @@ import { DatabaseCF } from '../core/database-cf.js';
 import { encrypt, decrypt } from '../core/crypto-cf.js';
 
 // 缓存 access_token（使用 KV 或内存）
-async function getAccessToken(db, cache, encryptionKey, corpid, encryptedCorpsecret) {
+async function getAccessToken(db, cache, encryptionKey, corpid, encryptedCorpsecret, proxyUrl = null) {
     // 验证必需参数
     if (!corpid) {
         throw new Error('CorpID 不能为空');
@@ -39,9 +39,12 @@ async function getAccessToken(db, cache, encryptionKey, corpid, encryptedCorpsec
     }
     
     // 从企业微信获取新 token
-    const response = await fetch(
-        `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${corpid}&corpsecret=${corpsecret}`
+    const url = buildWeChatAPIUrl(
+        `cgi-bin/gettoken?corpid=${corpid}&corpsecret=${corpsecret}`,
+        proxyUrl
     );
+    
+    const response = await fetch(url);
     const data = await response.json();
     
     if (data.errcode !== 0) {
@@ -65,11 +68,24 @@ async function getAccessToken(db, cache, encryptionKey, corpid, encryptedCorpsec
     return data.access_token;
 }
 
+// 构建企业微信 API URL（支持代理）
+function buildWeChatAPIUrl(endpoint, proxyUrl) {
+    if (proxyUrl) {
+        // 使用代理服务器
+        return `${proxyUrl}/${endpoint}`;
+    }
+    // 直接访问企业微信 API
+    return `https://qyapi.weixin.qq.com/${endpoint}`;
+}
+
 // 验证企业微信凭证
-export async function validateCredentials(corpid, corpsecret) {
-    const response = await fetch(
-        `https://qyapi.weixin.qq.com/cgi-bin/gettoken?corpid=${corpid}&corpsecret=${corpsecret}`
+export async function validateCredentials(corpid, corpsecret, proxyUrl = null) {
+    const url = buildWeChatAPIUrl(
+        `cgi-bin/gettoken?corpid=${corpid}&corpsecret=${corpsecret}`,
+        proxyUrl
     );
+    
+    const response = await fetch(url);
     const data = await response.json();
     
     if (data.errcode !== 0) {
@@ -77,9 +93,12 @@ export async function validateCredentials(corpid, corpsecret) {
     }
     
     // 获取成员列表
-    const usersResponse = await fetch(
-        `https://qyapi.weixin.qq.com/cgi-bin/user/list?access_token=${data.access_token}&department_id=1`
+    const usersUrl = buildWeChatAPIUrl(
+        `cgi-bin/user/list?access_token=${data.access_token}&department_id=1`,
+        proxyUrl
     );
+    
+    const usersResponse = await fetch(usersUrl);
     const usersData = await usersResponse.json();
     
     if (usersData.errcode !== 0) {
