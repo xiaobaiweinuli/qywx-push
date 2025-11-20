@@ -2,10 +2,32 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/Node.js-18.x%2B-green.svg">
+  <img src="https://img.shields.io/badge/Cloudflare-Pages-orange.svg">
   <img src="https://img.shields.io/badge/Docker-Supported-blue.svg">
   <img src="https://img.shields.io/badge/License-MIT-yellow.svg">
   <img src="https://img.shields.io/badge/WeChat-Enterprise-red.svg">
 </p>
+
+## 🚀 多种部署方式
+
+本项目现在支持两种部署方式，满足不同场景需求：
+
+### 🌐 Cloudflare Pages 版本（推荐）
+- ⚡ 全球边缘部署，响应速度快
+- 💰 零运维成本，免费额度充足
+- 🔄 自动扩展，无需担心并发
+- ✅ **前端页面完全可用**，API 自动路由
+- 🛠️ **Wrangler CLI 本地调试**，开发体验极佳
+- 📖 [快速开始](./QUICKSTART-CLOUDFLARE.md) | [本地开发指南](./LOCAL-DEVELOPMENT-GUIDE.md) | [快速参考](./QUICK-REFERENCE.md)
+
+### 🖥️ 传统服务器版本
+- 🐳 支持 Docker 部署
+- 🔧 完全自主控制
+- 📦 本地数据存储
+- 📖 [部署指南](./docs/deployment-guide.md)
+
+### 🤔 不知道选哪个？
+查看 [部署方式对比指南](./DEPLOYMENT-COMPARISON.md) 帮助你做出最佳选择。
 
 ## 📖 项目概述
 
@@ -40,7 +62,15 @@
 
 为了提供更清晰、更易于维护的文档，我们将详细内容拆分为多个专项文档：
 
-### 部署与安装
+### 🌐 Cloudflare Pages 版本
+
+- [🚀 快速开始](./QUICKSTART-CLOUDFLARE.md) - 5分钟部署到 Cloudflare Pages
+- [📖 完整文档](./README-CLOUDFLARE.md) - Cloudflare 版本详细说明
+- [📥 部署指南](./docs/cloudflare-deployment.md) - 详细的部署步骤
+- [🔄 迁移指南](./docs/migration-guide.md) - 从传统版本迁移
+- [📊 改造总结](./CLOUDFLARE-MIGRATION-SUMMARY.md) - 技术改造详情
+
+### 🖥️ 传统服务器版本
 
 - [📥 部署指南](./docs/deployment-guide.md) - 详细的安装和部署步骤，包括Docker部署和本地部署方法
 - [⚙️ 环境变量配置](./docs/environment-variables.md) - 完整的环境变量说明和配置方法

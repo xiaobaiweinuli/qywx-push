@@ -1,0 +1,18 @@
+name = "wechat-notifier"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "public"
+
+# D1 数据库绑定
+[[d1_databases]]
+binding = "DB"
+database_name = "wechat-notifier-db"
+database_id = "ffa317f3-e3e9-4b32-9b49-cad556d78c5d"
+
+# 环境变量（敏感信息请在 Cloudflare Dashboard 中配置）
+[vars]
+NODE_ENV = "production"
+
+# KV 命名空间（可选，用于缓存 access_token）
+[[kv_namespaces]]
+binding = "CACHE"
+id = "f96f1bf45b7a4f87b21a845dffed9d32"

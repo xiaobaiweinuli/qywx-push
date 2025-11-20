@@ -1,0 +1,40 @@
+# Cloudflare 特定的 .gitignore 配置
+# 将此内容添加到你的 .gitignore 文件中
+
+# Wrangler
+.wrangler/
+wrangler.toml.backup
+
+# 本地环境变量
+.dev.vars
+
+# D1 本地数据库
+.mf/
+
+# 构建输出
+dist/
+.output/
+
+# 日志
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 依赖
+node_modules/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统
+.DS_Store
+Thumbs.db
+
+# 临时文件
+*.tmp
+.cache/
