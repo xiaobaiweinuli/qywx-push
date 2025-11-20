@@ -83,8 +83,18 @@ export async function encrypt(text, password) {
 
 // 解密函数
 export async function decrypt(encryptedText, password) {
+    // 检查输入是否有效
+    if (!encryptedText || encryptedText.trim() === '') {
+        throw new Error('无法解密空数据');
+    }
+    
     const key = await deriveKey(password);
     const combined = new Uint8Array(base642ab(encryptedText));
+    
+    // 检查数据长度是否足够
+    if (combined.length < 12) {
+        throw new Error('加密数据格式无效');
+    }
     
     // 分离 IV 和加密数据
     const iv = combined.slice(0, 12);

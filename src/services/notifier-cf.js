@@ -7,18 +7,36 @@ import { encrypt, decrypt } from '../core/crypto-cf.js';
 
 // 缓存 access_token（使用 KV 或内存）
 async function getAccessToken(db, cache, encryptionKey, corpid, encryptedCorpsecret) {
+    // 验证必需参数
+    if (!corpid) {
+        throw new Error('CorpID 不能为空');
+    }
+    
+    if (!encryptedCorpsecret) {
+        throw new Error('CorpSecret 未配置，请完成配置的第二步');
+    }
+    
     const cacheKey = `access_token_${corpid}`;
     
     // 尝试从 KV 缓存获取
     if (cache) {
-        const cached = await cache.get(cacheKey, 'json');
-        if (cached && cached.expires_at > Date.now()) {
-            return cached.token;
+        try {
+            const cached = await cache.get(cacheKey, 'json');
+            if (cached && cached.expires_at > Date.now()) {
+                return cached.token;
+            }
+        } catch (cacheError) {
+            console.warn('从缓存获取 token 失败:', cacheError.message);
         }
     }
     
     // 解密 corpsecret
-    const corpsecret = await decrypt(encryptedCorpsecret, encryptionKey);
+    let corpsecret;
+    try {
+        corpsecret = await decrypt(encryptedCorpsecret, encryptionKey);
+    } catch (decryptError) {
+        throw new Error(`解密 CorpSecret 失败: ${decryptError.message}`);
+    }
     
     // 从企业微信获取新 token
     const response = await fetch(
@@ -27,17 +45,21 @@ async function getAccessToken(db, cache, encryptionKey, corpid, encryptedCorpsec
     const data = await response.json();
     
     if (data.errcode !== 0) {
-        throw new Error(`获取access_token失败: ${data.errmsg}`);
+        throw new Error(`获取access_token失败: ${data.errmsg} (错误码: ${data.errcode})`);
     }
     
     // 缓存到 KV（提前5分钟过期）
     if (cache) {
-        await cache.put(cacheKey, JSON.stringify({
-            token: data.access_token,
-            expires_at: Date.now() + (data.expires_in - 300) * 1000
-        }), {
-            expirationTtl: data.expires_in - 300
-        });
+        try {
+            await cache.put(cacheKey, JSON.stringify({
+                token: data.access_token,
+                expires_at: Date.now() + (data.expires_in - 300) * 1000
+            }), {
+                expirationTtl: data.expires_in - 300
+            });
+        } catch (cacheError) {
+            console.warn('缓存 token 失败:', cacheError.message);
+        }
     }
     
     return data.access_token;
@@ -229,6 +251,11 @@ export async function sendNotification(db, cache, encryptionKey, code, title, co
         throw new Error('未找到配置');
     }
     
+    // 检查配置是否完整
+    if (!config.encrypted_corpsecret || !config.agentid || !config.touser) {
+        throw new Error('配置未完成，请先完成第二步配置（填写 CorpSecret、AgentID 和接收用户）');
+    }
+    
     const accessToken = await getAccessToken(db, cache, encryptionKey, config.corpid, config.encrypted_corpsecret);
     
     const message = {
@@ -265,6 +292,11 @@ export async function sendEnhancedNotification(db, cache, encryptionKey, code, m
     
     if (!config) {
         throw new Error('未找到配置');
+    }
+    
+    // 检查配置是否完整
+    if (!config.encrypted_corpsecret || !config.agentid || !config.touser) {
+        throw new Error('配置未完成，请先完成第二步配置（填写 CorpSecret、AgentID 和接收用户）');
     }
     
     const accessToken = await getAccessToken(db, cache, encryptionKey, config.corpid, config.encrypted_corpsecret);
